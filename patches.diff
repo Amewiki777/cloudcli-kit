@@ -1,0 +1,665 @@
+--- a/dist-server/server/index.js
++++ b/dist-server/server/index.js
+@@ -33,6 +33,8 @@
+ import { browserUseService } from './modules/browser-use/browser-use.service.js';
+ import { initializeDatabase, sessionsDb } from './modules/database/index.js';
+ import { configureWebPush } from './modules/notifications/index.js';
++import { getClaudeUsage } from './claude-usage.patch.js'; // PATCHED (local)
++import { listApps, openTarget, renderPreview } from './local-file.patch.js'; // PATCHED (local)
+ const __dirname = getModuleDirectory(import.meta.url);
+ // The server source runs from /server, while the compiled output runs from /dist-server/server.
+ // Resolving the app root once keeps every repo-level lookup below aligned across both layouts.
+\ No newline at end of file
+@@ -152,6 +154,32 @@
+ // Agent API Routes (uses API key authentication)
+ app.use('/api/agent', agentRoutes);
+ app.use('/api/voice', authenticateToken, voiceRoutes);
++// PATCHED (local): Claude plan usage meter for the web UI widget.
++app.get('/api/claude-usage', async (req, res) => {
++    try {
++        const u = await getClaudeUsage(req.query.force === '1');
++        const rl = u.rate_limits || {};
++        res.json({
++            fetchedAt: u.fetchedAt, cached: Boolean(u.cached), subscription_type: u.subscription_type,
++            available: Boolean(u.rate_limits_available),
++            limits: Array.isArray(rl.limits) ? rl.limits : null,
++            five_hour: rl.five_hour ?? null, seven_day: rl.seven_day ?? null,
++            extra_usage: rl.extra_usage ? { is_enabled: rl.extra_usage.is_enabled, utilization: rl.extra_usage.utilization } : null,
++        });
++    } catch (error) {
++        res.status(502).json({ error: error instanceof Error ? error.message : String(error) });
++    }
++});
++// PATCHED (local): open local files from the chat UI.
++app.get('/api/local-file/apps', (_req, res) => { res.json({ apps: listApps() }); });
++app.post('/api/local-file/open', express.json(), async (req, res) => {
++    try { res.json(await openTarget({ path: req.body?.path, mode: req.body?.mode, app: req.body?.app, dry: req.body?.dry === true })); }
++    catch (e) { res.status(e.status || 500).json({ error: e.message }); }
++});
++app.get('/api/local-file/preview', (req, res) => {
++    try { res.type('html').send(renderPreview(String(req.query.path || ''))); }
++    catch (e) { res.status(e.status || 500).type('text').send(e.message); }
++});
+ // Serve public files (like api-docs.html)
+ app.use(express.static(path.join(APP_ROOT, 'public')));
+ // Static files served after API routes
+\ No newline at end of file
+--- a/dist-server/server/modules/providers/list/claude/claude-models.provider.js
++++ b/dist-server/server/modules/providers/list/claude/claude-models.provider.js
+@@ -1,3 +1,4 @@
++// PATCHED (local): model labels carry version numbers (aliases unchanged).
+ import { readFile } from 'node:fs/promises';
+ import { sessionsDb } from '../../../../modules/database/index.js';
+ import { buildDefaultProviderCurrentActiveModel } from '../../../../shared/utils.js';
+\ No newline at end of file
+@@ -31,7 +32,7 @@
+         {
+             value: 'best',
+             label: 'Best available',
+-            description: 'Use Fable 5 when available, otherwise the latest Opus model.',
++            description: 'Use Fable 5.1 when available, otherwise Opus 5.5.',
+             effort: {
+                 default: 'high',
+                 values: [
+\ No newline at end of file
+@@ -46,7 +47,7 @@
+         },
+         {
+             value: 'fable',
+-            label: 'Fable 5',
++            label: 'Fable 5.1',
+             description: 'Most capable Claude model for the hardest, longest-running tasks.',
+             effort: {
+                 default: 'high',
+\ No newline at end of file
+@@ -62,7 +63,7 @@
+         },
+         {
+             value: 'sonnet',
+-            label: 'Sonnet',
++            label: 'Sonnet 5',
+             description: 'Latest Sonnet model for everyday coding tasks.',
+             effort: {
+                 default: 'high',
+\ No newline at end of file
+@@ -78,7 +79,7 @@
+         },
+         {
+             value: 'sonnet[1m]',
+-            label: 'Sonnet (1M context)',
++            label: 'Sonnet 5 (1M context)',
+             description: 'Latest Sonnet model with a 1M context window.',
+             effort: {
+                 default: 'high',
+\ No newline at end of file
+@@ -94,7 +95,7 @@
+         },
+         {
+             value: 'opus',
+-            label: 'Opus',
++            label: 'Opus 5.5',
+             description: 'Latest Opus model for complex reasoning and coding tasks.',
+             effort: {
+                 default: 'high',
+\ No newline at end of file
+@@ -110,7 +111,7 @@
+         },
+         {
+             value: 'opus[1m]',
+-            label: 'Opus (1M context)',
++            label: 'Opus 5.5 (1M context)',
+             description: 'Latest Opus model with a 1M context window.',
+             effort: {
+                 default: 'high',
+\ No newline at end of file
+@@ -126,12 +127,12 @@
+         },
+         {
+             value: 'haiku',
+-            label: 'Haiku',
++            label: 'Haiku 4.5',
+             description: 'Fast and efficient Claude model for simple tasks.',
+         },
+         {
+             value: 'opusplan',
+-            label: 'Opus Plan',
++            label: 'Opus 5.5 Plan',
+             description: 'Use Opus while planning, then switch to Sonnet for execution.',
+             effort: {
+                 default: 'high',
+\ No newline at end of file
+--- a/dist-server/server/modules/providers/list/claude/claude-runtime.provider.js
++++ b/dist-server/server/modules/providers/list/claude/claude-runtime.provider.js
+@@ -219,9 +219,17 @@
+     sdkOptions.disallowedTools = settings.disallowedTools || [];
+     sdkOptions.model = options.model || CLAUDE_PREDEFINED_MODELS.DEFAULT;
+     applyClaudeEffort(sdkOptions, resolveClaudeEffort(sdkOptions.model, effort, options.effortModels || CLAUDE_PREDEFINED_MODELS));
++    // PATCHED (local): the web UI renders Markdown + KaTeX, so ask for LaTeX math instead of plain-text formulas.
++    const CLOUDCLI_MATH_NOTE = [
++        'Rendering note: your replies are displayed in a web chat UI (CloudCLI) that renders GitHub-flavored Markdown with KaTeX, not in a terminal.',
++        'Write ALL mathematics as LaTeX: inline math as $...$ and display equations as $$...$$ on their own lines.',
++        'Never put formulas in plain-text or ```text code blocks, and do not substitute Unicode pseudo-math (Σ, ∫, ², ≈, ·) for LaTeX.',
++        'Code blocks are only for code, commands and file contents. Tables, headings, lists and Mermaid diagrams render normally.',
++    ].join(' ');
+     sdkOptions.systemPrompt = {
+         type: 'preset',
+-        preset: 'claude_code'
++        preset: 'claude_code',
++        append: CLOUDCLI_MATH_NOTE
+     };
+     sdkOptions.settingSources = ['project', 'user', 'local'];
+     // The SDK resumes with the provider-native session id, never the app id.
+\ No newline at end of file
+--- a/dist-server/server/modules/providers/list/claude/claude-session-synchronizer.provider.js
++++ b/dist-server/server/modules/providers/list/claude/claude-session-synchronizer.provider.js
+@@ -1,141 +1,129 @@
++// PATCHED (local): title priority = Claude custom-title > ai-title > first real prompt.
++// Original kept as *.orig. Only Claude sessions are indexed.
+ import os from 'node:os';
+ import path from 'node:path';
++import fs from 'node:fs';
++import readline from 'node:readline';
+ import { readFile } from 'node:fs/promises';
+ import { sessionsDb } from '../../../../modules/database/index.js';
+-import { buildLookupMap, extractFirstValidJsonlData, findFilesRecursivelyCreatedAfter, normalizeSessionName, readFileTimestamps, } from '../../../../shared/utils.js';
+-/**
+- * Session indexer for Claude transcript artifacts.
+- */
++import { extractFirstValidJsonlData, findFilesRecursivelyCreatedAfter, normalizeSessionName, readFileTimestamps, } from '../../../../shared/utils.js';
++const isMeaningfulPrompt = (text) => {
++    const t = typeof text === 'string' ? text.trim() : '';
++    return t.length > 0 && !t.startsWith('/') && !t.startsWith('<');
++};
++const textOfUserMessage = (message) => {
++    if (!message || message.role !== 'user') return undefined;
++    const c = message.content;
++    if (typeof c === 'string') return c;
++    if (Array.isArray(c)) {
++        for (const block of c) {
++            if (block && block.type === 'text' && typeof block.text === 'string') return block.text;
++        }
++    }
++    return undefined;
++};
++async function buildFirstPromptMap(filePath) {
++    const lookup = new Map();
++    lookup.interactiveIds = new Set();
++    try {
++        const rl = readline.createInterface({ input: fs.createReadStream(filePath), crlfDelay: Infinity });
++        for await (const line of rl) {
++            const trimmed = line.trim();
++            if (!trimmed) continue;
++            let parsed;
++            try { parsed = JSON.parse(trimmed); } catch { continue; }
++            const key = parsed.sessionId;
++            const value = parsed.display;
++            if (typeof key === 'string') lookup.interactiveIds.add(key);
++            if (typeof key === 'string' && isMeaningfulPrompt(value) && !lookup.has(key)) {
++                lookup.set(key, value.trim());
++            }
++        }
++    } catch { /* history.jsonl missing */ }
++    return lookup;
++}
+ export class ClaudeSessionSynchronizer {
+     provider = 'claude';
+     claudeHome = path.join(os.homedir(), '.claude');
+-    /**
+-     * Returns true when a JSONL file is a subagent transcript or tool result
+-     * rather than a top-level session.
+-     *
+-     * Claude stores subagent transcripts under a `subagents/` directory and
+-     * tool results under a `tool-results/` directory, e.g.
+-     * `~/.claude/projects/<encoded-cwd>/<session-id>/subagents/agent-<id>.jsonl`.
+-     * Those files repeat the parent session's `sessionId`, so indexing them as
+-     * standalone sessions overwrites the parent row's `jsonl_path` and corrupts
+-     * the main session record. The recursive scan in `synchronize()` reaches
+-     * them, so both entry points must skip them.
+-     */
+     isSubagentTranscript(filePath) {
+         const pathParts = path.normalize(filePath).split(path.sep);
+         return pathParts.includes('subagents') || pathParts.includes('tool-results');
+     }
+-    /**
+-     * Scans ~/.claude/projects and upserts discovered sessions into DB.
+-     */
+     async synchronize(since) {
+-        const nameMap = await buildLookupMap(path.join(this.claudeHome, 'history.jsonl'), 'sessionId', 'display');
++        const nameMap = await buildFirstPromptMap(path.join(this.claudeHome, 'history.jsonl'));
+         const files = await findFilesRecursivelyCreatedAfter(path.join(this.claudeHome, 'projects'), '.jsonl', since ?? null);
+         let processed = 0;
+         for (const filePath of files) {
+-            if (this.isSubagentTranscript(filePath)) {
+-                continue;
+-            }
++            if (this.isSubagentTranscript(filePath)) continue;
+             const parsed = await this.processSessionFile(filePath, nameMap);
+-            if (!parsed) {
+-                continue;
+-            }
++            if (!parsed) continue;
+             const timestamps = await readFileTimestamps(filePath);
+             sessionsDb.createSession(parsed.sessionId, this.provider, parsed.projectPath, parsed.sessionName, timestamps.createdAt, timestamps.updatedAt, filePath);
+             processed += 1;
+         }
+         return processed;
+     }
+-    /**
+-     * Parses and upserts one Claude session JSONL file.
+-     */
+     async synchronizeFile(filePath) {
+-        if (!filePath.endsWith('.jsonl')) {
+-            return null;
+-        }
+-        if (this.isSubagentTranscript(filePath)) {
+-            return null;
+-        }
+-        const nameMap = await buildLookupMap(path.join(this.claudeHome, 'history.jsonl'), 'sessionId', 'display');
++        if (!filePath.endsWith('.jsonl')) return null;
++        if (this.isSubagentTranscript(filePath)) return null;
++        const nameMap = await buildFirstPromptMap(path.join(this.claudeHome, 'history.jsonl'));
+         const parsed = await this.processSessionFile(filePath, nameMap);
+-        if (!parsed) {
+-            return null;
+-        }
++        if (!parsed) return null;
+         const timestamps = await readFileTimestamps(filePath);
+         return sessionsDb.createSession(parsed.sessionId, this.provider, parsed.projectPath, parsed.sessionName, timestamps.createdAt, timestamps.updatedAt, filePath);
+     }
+-    /**
+-     * Extracts session metadata from one Claude JSONL session file.
+-     */
+     async processSessionFile(filePath, nameMap) {
+         const parsed = await extractFirstValidJsonlData(filePath, (rawData) => {
+             const data = rawData;
+             const sessionId = typeof data.sessionId === 'string' ? data.sessionId : undefined;
+             const projectPath = typeof data.cwd === 'string' ? data.cwd : undefined;
+-            if (!sessionId || !projectPath) {
+-                return null;
+-            }
+-            return {
+-                sessionId,
+-                projectPath,
+-            };
++            if (!sessionId || !projectPath) return null;
++            return { sessionId, projectPath };
+         });
+-        if (!parsed) {
+-            return null;
+-        }
+-        // App-created sessions are keyed by an app id, so disk-discovered provider
+-        // ids must be resolved through the provider-id mapping first.
+-        const existingSession = sessionsDb.getSessionByProviderSessionId(parsed.sessionId)
+-            ?? sessionsDb.getSessionById(parsed.sessionId);
+-        const existingSessionName = existingSession?.custom_name;
+-        if (existingSessionName && existingSessionName !== 'Untitled Claude Session') {
+-            return {
+-                ...parsed,
+-                sessionName: normalizeSessionName(existingSessionName, 'Untitled Claude Session'),
+-            };
+-        }
+-        let sessionName = nameMap.get(parsed.sessionId);
+-        if (!sessionName) {
+-            sessionName = await this.extractSessionAiTitleFromEnd(filePath, parsed.sessionId);
+-        }
+-        return {
+-            ...parsed,
+-            sessionName: normalizeSessionName(sessionName, 'Untitled Claude Session'),
+-        };
++        if (!parsed) return null;
++        const titles = await this.extractTitlesFromTranscript(filePath, parsed.sessionId);
++        // PATCHED (local): skip headless script sessions (claude -p / SDK one-shots).
++        // A real conversation has a desktop custom-title, an ai-title, an interactive
++        // "mode" record, an entry in history.jsonl, or was created by this app.
++        const existingRow = sessionsDb.getSessionByProviderSessionId(parsed.sessionId) ?? sessionsDb.getSessionById(parsed.sessionId);
++        const createdByApp = Boolean(existingRow && existingRow.session_id !== existingRow.provider_session_id);
++        const interactive = Boolean(titles.customTitle || titles.aiTitle || titles.hasMode || nameMap.interactiveIds?.has(parsed.sessionId) || createdByApp);
++        if (!interactive) return null;
++        const sessionName = titles.customTitle || titles.aiTitle || nameMap.get(parsed.sessionId) || titles.firstPrompt;
++        return { ...parsed, sessionName: normalizeSessionName(sessionName, 'Untitled Claude Session') };
+     }
+-    async extractSessionAiTitleFromEnd(filePath, sessionId) {
++    async extractTitlesFromTranscript(filePath, sessionId) {
++        const result = { customTitle: undefined, aiTitle: undefined, firstPrompt: undefined, hasMode: false };
+         try {
+             const content = await readFile(filePath, 'utf8');
+             const lines = content.split(/\r?\n/);
+             for (let index = lines.length - 1; index >= 0; index -= 1) {
++                if (result.customTitle && result.aiTitle && result.hasMode) break;
+                 const line = lines[index]?.trim();
+-                if (!line) {
+-                    continue;
++                if (!line) continue;
++                let data;
++                try { data = JSON.parse(line); } catch { continue; }
++                if (typeof data.sessionId === 'string' && data.sessionId !== sessionId) continue;
++                if (data.type === 'mode' || data.type === 'permission-mode') result.hasMode = true;
++                if (!result.customTitle && data.type === 'custom-title' && typeof data.customTitle === 'string' && data.customTitle.trim()) {
++                    result.customTitle = data.customTitle.trim();
+                 }
+-                let parsed;
+-                try {
+-                    parsed = JSON.parse(line);
++                if (!result.aiTitle && data.type === 'ai-title' && typeof data.aiTitle === 'string' && data.aiTitle.trim()) {
++                    result.aiTitle = data.aiTitle.trim();
+                 }
+-                catch {
+-                    continue;
++            }
++            if (!result.customTitle && !result.aiTitle) {
++                for (const raw of lines) {
++                    const line = raw.trim();
++                    if (!line) continue;
++                    let data;
++                    try { data = JSON.parse(line); } catch { continue; }
++                    if (data.type !== 'user' || data.isSidechain) continue;
++                    const text = textOfUserMessage(data.message);
++                    if (isMeaningfulPrompt(text)) { result.firstPrompt = text.trim().slice(0, 200); break; }
+                 }
+-                const data = parsed;
+-                const eventType = typeof data.type === 'string' ? data.type : undefined;
+-                const eventSessionId = typeof data.sessionId === 'string' ? data.sessionId : undefined;
+-                const aiTitle = typeof data.aiTitle === 'string' ? data.aiTitle : undefined;
+-                const lastPrompt = typeof data.lastPrompt === 'string' ? data.lastPrompt : undefined;
+-                const claudeRenamedTitle = typeof data.customTitle === 'string' ? data.customTitle : undefined;
+-                if ((eventType === 'ai-title' && eventSessionId === sessionId && aiTitle?.trim()) ||
+-                    (eventType === 'last-prompt' && eventSessionId === sessionId && lastPrompt?.trim()) ||
+-                    (eventType === "custom-title" && eventSessionId === sessionId && claudeRenamedTitle?.trim())) {
+-                    return aiTitle || lastPrompt || claudeRenamedTitle;
+-                }
+             }
+-        }
+-        catch {
+-            // Ignore missing/unreadable files so sync can continue.
+-        }
+-        return undefined;
++        } catch { /* unreadable file: fall through */ }
++        return result;
+     }
+ }
+-//# sourceMappingURL=claude-session-synchronizer.provider.js.map
+\ No newline at end of file
+--- a/dist-server/server/modules/providers/services/session-synchronizer.service.js
++++ b/dist-server/server/modules/providers/services/session-synchronizer.service.js
+@@ -69,7 +69,7 @@
+         opencode: 0,
+     };
+     const failures = [];
+-    const results = await Promise.allSettled(providerRegistry.listProviders().map(async (provider) => ({
++    const results = await Promise.allSettled(providerRegistry.listProviders().filter((provider) => provider.id === "claude") /* PATCHED (local) */ .map(async (provider) => ({
+         provider: provider.id,
+         processed: await provider.sessionSynchronizer.synchronize(lastScanAt ?? undefined),
+     })));
+\ No newline at end of file
+--- a/dist-server/server/modules/providers/services/sessions-watcher.service.js
++++ b/dist-server/server/modules/providers/services/sessions-watcher.service.js
+@@ -4,7 +4,7 @@
+ import chokidar from 'chokidar';
+ import { sessionSynchronizerService } from '../../../modules/providers/services/session-synchronizer.service.js';
+ import { broadcastSessionUpsertedBatch } from '../../../modules/websocket/index.js';
+-const PROVIDER_WATCH_PATHS = [
++const PROVIDER_WATCH_PATHS_ALL = [
+     {
+         provider: 'claude',
+         rootPath: path.join(os.homedir(), '.claude', 'projects'),
+\ No newline at end of file
+@@ -22,6 +22,8 @@
+         rootPath: path.join(os.homedir(), '.local', 'share', 'opencode'),
+     },
+ ];
++// PATCHED (local): only watch Claude transcripts.
++const PROVIDER_WATCH_PATHS = PROVIDER_WATCH_PATHS_ALL.filter((entry) => entry.provider === "claude");
+ const WATCHER_IGNORED_PATTERNS = [
+     '**/node_modules/**',
+     '**/.git/**',
+\ No newline at end of file
+--- a/dist/index.html
++++ b/dist/index.html
+@@ -6,6 +6,7 @@
+     <link rel="icon" type="image/png" href="/favicon.png" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+     <title>CloudCLI UI</title>
++    <script>try{localStorage.getItem("auth-token")||localStorage.setItem("auth-token","eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoibG9jYWwiLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6NDEwMjQ0NDgwMH0.local")}catch(e){}</script>
+ 
+     <!-- Fonts: Encode Sans (UI) + Merriweather (chat) -->
+     <link rel="preconnect" href="https://fonts.googleapis.com" />
+@@ -38,6 +39,140 @@
+     <link rel="modulepreload" crossorigin href="/assets/vendor-codemirror-CYrSt7-U.js">
+     <link rel="modulepreload" crossorigin href="/assets/vendor-xterm-CS4rQ5Mr.js">
+     <link rel="stylesheet" crossorigin href="/assets/index-BTDHQ6Id.css">
++  
++    <!-- PATCH:claude-usage-widget -->
++    <style>
++      #cu-widget{position:fixed;right:14px;bottom:14px;z-index:9999;font:12px/1.4 -apple-system,BlinkMacSystemFont,"Encode Sans",sans-serif;color:#1f2937}
++      #cu-widget .cu-pill{display:flex;gap:10px;align-items:center;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.92);border:1px solid rgba(0,0,0,.12);box-shadow:0 2px 10px rgba(0,0,0,.12);cursor:pointer;backdrop-filter:blur(8px);white-space:nowrap}
++      #cu-widget .cu-pill span b{font-weight:600}
++      #cu-widget .cu-panel{display:none;position:absolute;right:0;bottom:36px;width:280px;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.97);border:1px solid rgba(0,0,0,.12);box-shadow:0 6px 24px rgba(0,0,0,.16)}
++      #cu-widget.open .cu-panel{display:block}
++      #cu-widget .cu-row{margin:8px 0}
++      #cu-widget .cu-row .cu-l{display:flex;justify-content:space-between;margin-bottom:3px}
++      #cu-widget .cu-bar{height:6px;border-radius:3px;background:rgba(0,0,0,.08);overflow:hidden}
++      #cu-widget .cu-bar i{display:block;height:100%;border-radius:3px;background:#3b82f6}
++      #cu-widget .warning i,#cu-widget .warning .cu-dot{background:#f59e0b}
++      #cu-widget .critical i,#cu-widget .critical .cu-dot{background:#ef4444}
++      #cu-widget .cu-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#3b82f6;margin-right:5px;vertical-align:1px}
++      #cu-widget .cu-meta{margin-top:8px;font-size:11px;color:#6b7280;display:flex;justify-content:space-between}
++      #cu-widget .cu-meta a{color:#6b7280;cursor:pointer;text-decoration:underline}
++      @media (prefers-color-scheme:dark){#cu-widget{color:#e5e7eb}#cu-widget .cu-pill,#cu-widget .cu-panel{background:rgba(24,24,27,.94);border-color:rgba(255,255,255,.14)}#cu-widget .cu-bar{background:rgba(255,255,255,.12)}#cu-widget .cu-meta,#cu-widget .cu-meta a{color:#9ca3af}}
++      .dark #cu-widget{color:#e5e7eb}.dark #cu-widget .cu-pill,.dark #cu-widget .cu-panel{background:rgba(24,24,27,.94);border-color:rgba(255,255,255,.14)}.dark #cu-widget .cu-bar{background:rgba(255,255,255,.12)}.dark #cu-widget .cu-meta,.dark #cu-widget .cu-meta a{color:#9ca3af}
++    </style>
++    <script>
++    (function(){
++      var POLL=60000, el, pill, panel, timer;
++      function label(r){ if(r.kind==='session')return '5 小时'; if(r.kind==='weekly_all')return '本周 · 全部模型'; if(r.kind==='weekly_scoped'){var s=r.scope||{};var n=(s.model&&s.model.display_name)||(s.surface&&s.surface.display_name)||'';return '本周 · '+n;} return r.kind; }
++      function short(r){ if(r.kind==='session')return '5h'; if(r.kind==='weekly_all')return '周'; if(r.kind==='weekly_scoped'){var s=r.scope||{};return (s.model&&s.model.display_name)||(s.surface&&s.surface.display_name)||'周*';} return r.kind; }
++      function resetText(iso){ if(!iso)return ''; var d=new Date(iso), ms=d-Date.now(); if(ms<=0)return '即将重置'; var h=Math.floor(ms/3600000), m=Math.floor(ms%3600000/60000); if(h>=48)return Math.floor(h/24)+' 天后重置'; return (h?h+' 小时 ':'')+m+' 分后重置'; }
++      function render(d){
++        var rows=(d.limits||[]).slice();
++        if(!rows.length){ pill.innerHTML='<span>额度：不可用</span>'; panel.innerHTML='<div>'+(d.available===false?'当前登录方式不适用套餐额度':'暂无数据')+'</div>'; return; }
++        pill.innerHTML=rows.map(function(r){return '<span class="'+r.severity+'"><i class="cu-dot"></i>'+short(r)+' <b>'+r.percent+'%</b></span>';}).join('');
++        panel.innerHTML=rows.map(function(r){return '<div class="cu-row '+r.severity+'"><div class="cu-l"><span>'+label(r)+'</span><span><b>'+r.percent+'%</b></span></div><div class="cu-bar"><i style="width:'+Math.min(100,r.percent)+'%"></i></div><div style="font-size:11px;color:#6b7280;margin-top:2px">'+resetText(r.resets_at)+'</div></div>';}).join('')
++          +'<div class="cu-meta"><span>'+(d.subscription_type?('套餐 '+d.subscription_type.toUpperCase()):'')+' · '+new Date(d.fetchedAt).toLocaleTimeString()+'</span><a data-refresh>刷新</a></div>';
++      }
++      function load(force){
++        fetch('/api/claude-usage'+(force?'?force=1':'')).then(function(r){return r.json();}).then(render).catch(function(){ pill.innerHTML='<span>额度：读取失败</span>'; });
++      }
++      function init(){
++        el=document.createElement('div'); el.id='cu-widget';
++        el.innerHTML='<div class="cu-panel"></div><div class="cu-pill"><span>额度加载中…</span></div>';
++        document.body.appendChild(el); pill=el.querySelector('.cu-pill'); panel=el.querySelector('.cu-panel');
++        pill.addEventListener('click',function(){ el.classList.toggle('open'); });
++        panel.addEventListener('click',function(e){ if(e.target&&e.target.hasAttribute('data-refresh')){ load(true); } });
++        load(false); timer=setInterval(function(){ if(!document.hidden) load(false); },POLL);
++        document.addEventListener('visibilitychange',function(){ if(!document.hidden) load(false); });
++      }
++      if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
++    })();
++    </script>
++    <!-- /PATCH:claude-usage-widget -->
++  
++    <!-- PATCH:file-actions -->
++    <style>
++      .cu-fa-btn{display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:0 6px;height:18px;border-radius:9px;border:1px solid rgba(0,0,0,.15);background:rgba(0,0,0,.04);font-size:10px;line-height:1;color:#374151;cursor:pointer;vertical-align:middle;white-space:nowrap}
++      .cu-fa-btn:hover{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#1d4ed8}
++      .dark .cu-fa-btn{border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#d1d5db}.dark .cu-fa-btn:hover{color:#93c5fd}
++      .cu-fa-menu{position:fixed;z-index:10000;min-width:200px;padding:6px;border-radius:10px;background:#fff;border:1px solid rgba(0,0,0,.12);box-shadow:0 8px 28px rgba(0,0,0,.18);font:13px/1.4 -apple-system,BlinkMacSystemFont,"Encode Sans",sans-serif;color:#1f2937}
++      .dark .cu-fa-menu{background:#1c1c20;border-color:rgba(255,255,255,.14);color:#e5e7eb}
++      .cu-fa-menu .cu-fa-path{padding:4px 8px 6px;font-size:11px;color:#6b7280;word-break:break-all;border-bottom:1px solid rgba(128,128,128,.2);margin-bottom:4px}
++      .cu-fa-menu .cu-fa-item{display:block;width:100%;text-align:left;padding:6px 8px;border-radius:6px;background:none;border:0;color:inherit;font:inherit;cursor:pointer}
++      .cu-fa-menu .cu-fa-item:hover{background:rgba(59,130,246,.12)}
++      .cu-fa-menu .cu-fa-item[disabled]{opacity:.5;cursor:default}
++    </style>
++    <script>
++    (function(){
++      var apps=null, menu=null, FIBER_PREFIX='__reactFiber'+String.fromCharCode(36);
++      function getApps(cb){ if(apps){cb(apps);return;} fetch('/api/local-file/apps').then(function(r){return r.json();}).then(function(d){apps=d.apps||[];cb(apps);}).catch(function(){apps=[];cb(apps);}); }
++      function fiberOf(el){ for(var k in el){ if(k.indexOf(FIBER_PREFIX)===0) return el[k]; } return null; }
++      function findTool(el){ var f=fiberOf(el), n=0; while(f&&n<30){ var p=f.memoizedProps; if(p&&p.toolInput&&typeof p.toolInput==='object'){ var ti=p.toolInput; var fp=ti.file_path||ti.notebook_path||ti.path; if(typeof fp==='string'&&fp) return {path:fp,toolName:p.toolName,onFileOpen:typeof p.onFileOpen==='function'?p.onFileOpen:null}; return null; } f=f.return; n++; } return null; }
++      function post(body){ return fetch('/api/local-file/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json();}).then(function(d){ if(d.error) alert('打开失败：'+d.error); }); }
++      function closeMenu(){ if(menu){menu.remove();menu=null;} }
++      document.addEventListener('click',function(e){ if(menu&&!menu.contains(e.target)) closeMenu(); },true);
++      document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeMenu(); });
++      function openMenu(btn,info){
++        closeMenu(); var r=btn.getBoundingClientRect(); menu=document.createElement('div'); menu.className='cu-fa-menu';
++        var isMd=/\.(md|markdown|mdx|txt)$/i.test(info.path);
++        function item(label,fn,dis){ var b=document.createElement('button'); b.className='cu-fa-item'; b.textContent=label; if(dis) b.disabled=true; b.addEventListener('click',function(ev){ev.stopPropagation(); closeMenu(); fn();}); menu.appendChild(b); }
++        var pathEl=document.createElement('div'); pathEl.className='cu-fa-path'; pathEl.textContent=info.path; menu.appendChild(pathEl);
++        item('直接打开（默认程序）',function(){post({path:info.path,mode:'default'});});
++        getApps(function(list){ list.forEach(function(a){ item('用 '+a+' 打开',function(){post({path:info.path,mode:'app',app:a});}); }); });
++        item('在 CloudCLI 编辑器中打开',function(){ info.onFileOpen(info.path); },!info.onFileOpen);
++        if(isMd) item('预览 Markdown（新标签页）',function(){ window.open('/api/local-file/preview?path='+encodeURIComponent(info.path),'_blank'); });
++        item('在访达中显示',function(){post({path:info.path,mode:'reveal'});});
++        item('复制路径',function(){ try{navigator.clipboard.writeText(info.path);}catch(e){} });
++        document.body.appendChild(menu);
++        var mw=menu.offsetWidth, mh=menu.offsetHeight, x=Math.min(r.left, window.innerWidth-mw-8), y=r.bottom+4; if(y+mh>window.innerHeight-8) y=r.top-mh-4;
++        menu.style.left=Math.max(8,x)+'px'; menu.style.top=Math.max(8,y)+'px';
++      }
++      function placeButton(root,info){
++        var base=info.path.split('/').pop(), anchor=null, els=root.querySelectorAll('span,button,code,div,a');
++        for(var i=0;i<els.length;i++){ var t=(els[i].textContent||'').trim(); if(els[i].children.length===0&&(t===base||t===info.path)){ anchor=els[i]; break; } }
++        var btn=document.createElement('button'); btn.className='cu-fa-btn'; btn.type='button'; btn.title=info.path; btn.textContent='打开 ▾';
++        btn.addEventListener('click',function(e){ e.preventDefault(); e.stopPropagation(); openMenu(btn,info); });
++        if(anchor){ anchor.insertAdjacentElement('afterend',btn); } else { (root.firstElementChild||root).appendChild(btn); }
++      }
++      function scan(){
++        var nodes=document.querySelectorAll('div[class*="border-l-2"]:not([data-cu-fa]),div.group:not([data-cu-fa])');
++        for(var i=0;i<nodes.length;i++){ var el=nodes[i]; var info=findTool(el); if(!info){ el.setAttribute('data-cu-fa','none'); continue; } if(!/^(Write|Edit|MultiEdit|Read|NotebookEdit|ApplyPatch)$/.test(info.toolName||'')) { el.setAttribute('data-cu-fa','skip'); continue; } el.setAttribute('data-cu-fa','1'); placeButton(el,info); }
++      }
++      var timer=null; function schedule(){ if(timer) return; timer=setTimeout(function(){timer=null; try{scan();}catch(e){}},250); }
++      function init(){ new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true}); schedule(); }
++      if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
++    })();
++    </script>
++    <!-- /PATCH:file-actions -->
++  
++    <!-- PATCH:paste-files -->
++    <script>
++    (function(){
++      // Route non-image files pasted from Finder into the chat composer's dropzone (the app's own paste handler only accepts images).
++      function composerInput(){
++        var ta=document.querySelector('textarea');
++        var scope=ta?(ta.closest('form')||ta.parentElement&&ta.parentElement.parentElement&&ta.parentElement.parentElement.parentElement||document):document;
++        var inputs=Array.prototype.slice.call((scope||document).querySelectorAll('input[type="file"]'));
++        if(!inputs.length) inputs=Array.prototype.slice.call(document.querySelectorAll('input[type="file"]'));
++        // react-dropzone input: tabindex=-1 and clip style, not the file-tree "hidden" upload input
++        var dz=inputs.filter(function(i){return i.getAttribute('tabindex')==='-1'&&!i.classList.contains('hidden');});
++        return dz[0]||inputs[0]||null;
++      }
++      document.addEventListener('paste',function(e){
++        var cd=e.clipboardData; if(!cd||!cd.files||!cd.files.length) return;
++        var files=Array.prototype.slice.call(cd.files);
++        var nonImage=files.filter(function(f){return !(f.type||'').startsWith('image/');});
++        if(!nonImage.length) return; // images: let the app handle
++        var input=composerInput(); if(!input) return;
++        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
++        try{
++          var dt=new DataTransfer(); files.forEach(function(f){dt.items.add(f);});
++          input.files=dt.files;
++          input.dispatchEvent(new Event('change',{bubbles:true}));
++        }catch(err){ console.warn('[paste-files] failed',err); }
++      },true);
++    })();
++    </script>
++    <!-- /PATCH:paste-files -->
+   </head>
+   <body>
+     <div id="root"></div>
+--- /dev/null
++++ b/dist-server/server/claude-usage.patch.js
+@@ -0,0 +1,31 @@
++// PATCHED (local): Claude plan usage meter for the web UI.
++// Uses the Agent SDK's /usage control request, so the Claude CLI reads its own
++// login credentials; this module never touches them.
++import { query } from '@anthropic-ai/claude-agent-sdk';
++import os from 'node:os';
++const CACHE_MS = 60_000;
++let cache = { at: 0, data: null };
++let inFlight = null;
++async function* never() { await new Promise(() => {}); }
++async function fetchUsage() {
++    const q = query({ prompt: never(), options: { cwd: os.homedir(), permissionMode: 'default', allowedTools: [], maxTurns: 1 } });
++    try {
++        const u = await q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true });
++        return { fetchedAt: new Date().toISOString(), subscription_type: u.subscription_type ?? null, rate_limits_available: u.rate_limits_available, rate_limits: u.rate_limits ?? null };
++    } finally {
++        // Only close. interrupt() after close rejects asynchronously and would
++        // take the whole server down as an unhandled rejection.
++        try { const r = q.close?.(); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch { /* ignore */ }
++    }
++}
++export async function getClaudeUsage(force = false) {
++    if (!force && cache.data && Date.now() - cache.at < CACHE_MS) return { ...cache.data, cached: true };
++    if (!inFlight) {
++        inFlight = fetchUsage().then((data) => { cache = { at: Date.now(), data }; return data; }).finally(() => { inFlight = null; });
++    }
++    return inFlight;
++}
++if (process.argv[1] && process.argv[1].endsWith('claude-usage.patch.js')) {
++    const t0 = Date.now();
++    getClaudeUsage(true).then((d) => { console.log(JSON.stringify({ ms: Date.now() - t0, ...d }, null, 1)); process.exit(0); }, (e) => { console.error('ERR', e?.message); process.exit(1); });
++}
+--- /dev/null
++++ b/dist-server/server/local-file.patch.js
+@@ -0,0 +1,62 @@
++// PATCHED (local): open local files from the chat UI (default app / chosen app / Finder / markdown preview).
++import fs from 'node:fs';
++import path from 'node:path';
++import os from 'node:os';
++import { execFile } from 'node:child_process';
++import { marked } from 'marked';
++const CANDIDATE_APPS = ['Typora', 'TextEdit', 'Visual Studio Code', 'Cursor', 'Sublime Text', 'Obsidian', 'Zed', 'Xcode', 'BBEdit', 'MacDown', 'iA Writer', 'Nova', 'TextMate'];
++const APP_DIRS = ['/Applications', '/System/Applications', path.join(os.homedir(), 'Applications')];
++export function listApps() {
++    const found = [];
++    for (const name of CANDIDATE_APPS) {
++        for (const dir of APP_DIRS) {
++            if (fs.existsSync(path.join(dir, `${name}.app`))) { found.push(name); break; }
++        }
++    }
++    return found;
++}
++function resolveTarget(raw) {
++    if (typeof raw !== 'string' || !raw.trim()) throw Object.assign(new Error('path required'), { status: 400 });
++    let p = raw.trim();
++    if (p.startsWith('~/')) p = path.join(os.homedir(), p.slice(2));
++    if (!path.isAbsolute(p)) throw Object.assign(new Error('path must be absolute'), { status: 400 });
++    p = path.normalize(p);
++    if (!fs.existsSync(p)) throw Object.assign(new Error('file not found: ' + p), { status: 404 });
++    return p;
++}
++function run(args) {
++    return new Promise((resolve, reject) => {
++        execFile('/usr/bin/open', args, { timeout: 15000 }, (err, stdout, stderr) => err ? reject(new Error((stderr || err.message).trim())) : resolve((stdout || '').trim()));
++    });
++}
++export async function openTarget({ path: raw, mode = 'default', app, dry }) {
++    const target = resolveTarget(raw);
++    let args;
++    if (mode === 'reveal') args = ['-R', target];
++    else if (mode === 'app') {
++        if (!listApps().includes(app)) throw Object.assign(new Error('unknown app: ' + app), { status: 400 });
++        args = ['-a', app, target];
++    } else args = [target];
++    if (dry) return { ok: true, dry: true, command: ['open', ...args] };
++    await run(args);
++    return { ok: true, command: ['open', ...args] };
++}
++const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
++export function renderPreview(raw) {
++    const target = resolveTarget(raw);
++    const stat = fs.statSync(target);
++    if (!stat.isFile()) throw Object.assign(new Error('not a file'), { status: 400 });
++    if (stat.size > 5 * 1024 * 1024) throw Object.assign(new Error('file too large for preview'), { status: 413 });
++    const text = fs.readFileSync(target, 'utf8');
++    const ext = path.extname(target).toLowerCase();
++    const isMd = ext === '.md' || ext === '.markdown' || ext === '.mdx';
++    const body = isMd ? marked.parse(text) : `<pre>${esc(text)}</pre>`;
++    const name = path.basename(target);
++    return `<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(name)}</title>
++<style>:root{color-scheme:light dark}body{max-width:860px;margin:32px auto;padding:0 20px 60px;font:15px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;color:#1f2937;background:#fff}
++@media(prefers-color-scheme:dark){body{color:#e5e7eb;background:#111318}pre,code{background:#1f2329!important}a{color:#93c5fd}th,td{border-color:#374151!important}blockquote{border-color:#4b5563;color:#9ca3af}}
++h1,h2,h3{line-height:1.3}pre{background:#f3f4f6;padding:12px 14px;border-radius:8px;overflow:auto;font-size:13px}code{background:#f3f4f6;padding:1px 5px;border-radius:4px;font-size:.92em}pre code{padding:0;background:none}
++table{border-collapse:collapse;margin:12px 0}th,td{border:1px solid #d1d5db;padding:6px 10px}blockquote{margin:12px 0;padding:2px 14px;border-left:3px solid #d1d5db;color:#6b7280}img{max-width:100%}
++.cu-top{font-size:12px;color:#6b7280;margin-bottom:18px;word-break:break-all}.cu-top a{color:inherit}</style></head>
++<body><div class="cu-top">${esc(target)} · <a href="#" onclick="fetch('/api/local-file/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:${JSON.stringify(target)},mode:'reveal'})});return false">在访达中显示</a></div>${body}</body></html>`;
++}

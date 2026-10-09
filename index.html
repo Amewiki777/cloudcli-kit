@@ -1,0 +1,1160 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CloudCLI 搭建手册</title>
+<style>
+:root{
+  --bg:#f7f7f5;--surface:#ffffff;--surface-2:#f0efeb;--text:#1d1d1b;--muted:#6b6a65;--border:#e3e1da;
+  --accent:#c2562f;--accent-soft:#f6e7e0;--ok:#1f7a4d;--warn:#9a5b00;--warn-soft:#fbf0dc;--danger:#b42318;--danger-soft:#fbe9e7;
+  --code-bg:#f3f2ee;--add:#e6f4ea;--add-t:#1f6b3a;--del:#fde8e6;--del-t:#a3261c;--at:#6b5bd2;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#171715;--surface:#1f1f1c;--surface-2:#272724;--text:#ecebe6;--muted:#9c9a92;--border:#33322e;
+  --accent:#e2835c;--accent-soft:#3a2a22;--ok:#5cc28f;--warn:#e0a449;--warn-soft:#352b1b;--danger:#f0806f;--danger-soft:#3a2220;
+  --code-bg:#1a1a18;--add:#173323;--add-t:#8fd8ab;--del:#3a1e1c;--del-t:#f3a39a;--at:#a99cf0;
+}}
+:root[data-theme="dark"]{
+  --bg:#171715;--surface:#1f1f1c;--surface-2:#272724;--text:#ecebe6;--muted:#9c9a92;--border:#33322e;
+  --accent:#e2835c;--accent-soft:#3a2a22;--ok:#5cc28f;--warn:#e0a449;--warn-soft:#352b1b;--danger:#f0806f;--danger-soft:#3a2220;
+  --code-bg:#1a1a18;--add:#173323;--add-t:#8fd8ab;--del:#3a1e1c;--del-t:#f3a39a;--at:#a99cf0;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif}
+.wrap{max-width:900px;margin:0 auto;padding:40px 16px 80px}
+header h1{font-size:30px;line-height:1.25;margin:0 0 8px;letter-spacing:-.01em}
+header p.lede{color:var(--muted);margin:0 0 20px;font-size:16px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
+nav.toc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:36px}
+nav.toc b{font-size:13px;color:var(--muted);font-weight:600}
+nav.toc ol{margin:6px 0 0;padding-left:20px;columns:2;column-gap:28px}
+nav.toc a{color:var(--text);text-decoration:none}
+nav.toc a:hover{color:var(--accent)}
+h2{font-size:21px;margin:48px 0 12px;padding-top:8px;scroll-margin-top:16px}
+h2 .n{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:8px}
+h3{font-size:16px;margin:24px 0 8px}
+p{margin:10px 0}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:5px;border:1px solid var(--border);word-break:break-word}
+.codewrap{position:relative;margin:12px 0}
+pre{margin:0;font-family:var(--mono);font-size:12.8px;line-height:1.6;background:var(--code-bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;overflow:auto;max-height:560px;white-space:pre;tab-size:4}
+pre code{background:none;border:0;padding:0}
+.copy{position:absolute;top:8px;right:8px;font:12px/1 inherit;padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;opacity:.9}
+.copy:hover{color:var(--text);opacity:1}
+.copy.done{color:var(--ok);border-color:var(--ok)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:14px 0}
+.callout{border-radius:10px;padding:12px 16px;margin:14px 0;border:1px solid}
+.callout.warn{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
+.callout.danger{background:var(--danger-soft);border-color:color-mix(in srgb,var(--danger) 35%,transparent)}
+.callout b.t{display:block;margin-bottom:2px}
+.callout.warn b.t{color:var(--warn)}
+.callout.danger b.t{color:var(--danger)}
+.dl{display:flex;flex-wrap:wrap;align-items:center;gap:14px;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);border-radius:12px;padding:16px 18px;margin:18px 0}
+.btn{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:600;padding:9px 16px;border-radius:9px}
+.btn:hover{filter:brightness(1.07)}
+.dl small{color:var(--muted)}
+ol.steps{padding-left:0;list-style:none;counter-reset:s}
+ol.steps>li{counter-increment:s;position:relative;padding-left:38px;margin:16px 0}
+ol.steps>li::before{content:counter(s);position:absolute;left:0;top:1px;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:700;display:grid;place-items:center}
+.tbl{overflow-x:auto;margin:12px 0;border:1px solid var(--border);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:14px;background:var(--surface)}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:12.5px;color:var(--muted);font-weight:600;background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+td:first-child{white-space:nowrap;color:var(--muted);font-variant-numeric:tabular-nums}
+details.file{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:8px 0}
+details.file>summary{cursor:pointer;padding:10px 14px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;list-style:none}
+details.file>summary::-webkit-details-marker{display:none}
+details.file>summary::before{content:"▸";color:var(--muted);font-size:12px;transition:transform .15s}
+details.file[open]>summary::before{transform:rotate(90deg)}
+details.file>summary code{background:none;border:0;padding:0;font-size:13px;word-break:break-all}
+details.file .note{color:var(--muted);font-size:13px;flex-basis:100%;padding-left:18px}
+details.file .codewrap{margin:0 12px 12px}
+.st{font-family:var(--mono);font-size:12px}
+.pa{color:var(--add-t);font-weight:600}.pd{color:var(--del-t);font-weight:600}
+pre.diff span{display:inline-block;min-width:100%}
+pre.diff .add{background:var(--add);color:var(--add-t)}
+pre.diff .del{background:var(--del);color:var(--del-t)}
+pre.diff .at{color:var(--at)}
+pre.diff .h{color:var(--muted);font-weight:600}
+pre.diff .dim{color:var(--muted)}
+ul{padding-left:22px}
+li{margin:4px 0}
+footer{margin-top:56px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
+@media (max-width:640px){
+  header h1{font-size:24px}
+  nav.toc ol{columns:1}
+  pre{font-size:12px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>CloudCLI 搭建手册</h1>
+  <p class="lede">在浏览器里用 Claude Code。基于开源的 CloudCLI，加了一组本地补丁：免登录、只看 Claude 会话、标题和客户端一致、额度显示、一键打开文件。下面是复刻方法和全部改动代码。</p>
+  <div class="meta">
+    <span class="chip">@cloudcli-ai/cloudcli 1.37.3</span>
+    <span class="chip">macOS</span>
+    <span class="chip">Node 20+</span>
+    <span class="chip">Claude 订阅账号</span>
+    <span class="chip">更新于 2026-10-09</span>
+  </div>
+</header>
+
+<nav class="toc"><b>目录</b>
+<ol>
+  <li><a href="#quick">快速安装</a></li>
+  <li><a href="#what">改了什么、为什么</a></li>
+  <li><a href="#safety">安全须知</a></li>
+  <li><a href="#ops">日常运维</a></li>
+  <li><a href="#pitfalls">踩过的坑</a></li>
+  <li><a href="#desktop">导入 Claude 桌面客户端</a></li>
+  <li><a href="#manual">手动搭建（不用脚本）</a></li>
+  <li><a href="#code">全部代码</a></li>
+</ol></nav>
+
+<h2 id="quick"><span class="n">1</span>快速安装</h2>
+<div class="dl">
+  <a class="btn" href="https://github.com/Amewiki777/cloudcli-kit">GitHub 仓库</a>
+  <a class="btn" href="https://github.com/Amewiki777/cloudcli-kit/archive/refs/heads/main.zip">下载 zip</a>
+  <small>包含安装 / 卸载脚本、打好补丁的文件、diff、导入工具</small>
+</div>
+<ol class="steps">
+  <li><b>准备环境。</b>装好 Node 20+（推荐 nvm）和 Claude Code CLI，在终端里运行一次 <code>claude</code> 并用订阅账号登录。</li>
+  <li><b>下载并安装。</b>
+<div class="codewrap"><button class="copy" type="button">复制</button><pre>git clone https://github.com/Amewiki777/cloudcli-kit.git &amp;&amp; cd cloudcli-kit
+./install.sh</pre></div>
+    如果你的 Claude 要走本地代理（比如 Clash），把端口告诉脚本，它会写进常驻服务的环境变量：
+<div class="codewrap"><button class="copy" type="button">复制</button><pre>PROXY=http://127.0.0.1:7897 ./install.sh</pre></div>
+  </li>
+  <li><b>打开</b> <a href="http://localhost:3001">http://localhost:3001</a>。脚本跑完会自动打开。开机自启，不用再手动启动。</li>
+</ol>
+<p>脚本依次做的事：装固定版本 1.37.3 → 把 <code>files/</code> 覆盖进包目录（原文件备份成 <code>*.orig</code>）→ 按你本机的 node / claude 路径生成 launchd 配置并启动 → 注册一个占位用户、跳过首次引导。可以反复运行。</p>
+
+<h2 id="what"><span class="n">2</span>改了什么、为什么</h2>
+<div class="tbl"><table>
+<thead><tr><th>#</th><th>定制</th><th>为什么</th><th>改动位置</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><b>免登录</b>，只监听 127.0.0.1</td><td>原版强制注册账号、默认监听 0.0.0.0。自己本机用，登录是多余的</td><td><code>.env</code>、<code>dist/index.html</code></td></tr>
+<tr><td>2</td><td><b>只显示 Claude 会话</b></td><td>原版会把 Codex 等其它工具的会话也混进列表</td><td>两个 service 文件</td></tr>
+<tr><td>3</td><td><b>标题和 Claude 客户端一致</b>，隐藏脚本会话</td><td>原版取第一条输入当标题，会出现 <code>/model</code> 这种；<code>claude -p</code> 脚本产生的大量一次性会话会刷屏</td><td><code>claude-session-synchronizer.provider.js</code></td></tr>
+<tr><td>4</td><td><b>额度胶囊</b>（右下角）</td><td>随时看 5 小时 / 本周 / 本周 Fable 用量和重置时间，每 60 秒刷新</td><td>新增 <code>claude-usage.patch.js</code></td></tr>
+<tr><td>5</td><td><b>模型标签带版本号</b></td><td>原版只写 Opus / Sonnet，分不清是哪一代</td><td><code>claude-models.provider.js</code></td></tr>
+<tr><td>6</td><td>文件名旁的 <b>「打开 ▾」菜单</b></td><td>Claude 改了哪个文件，点一下用默认程序 / 指定编辑器打开、在 Finder 中显示，或预览 Markdown</td><td>新增 <code>local-file.patch.js</code></td></tr>
+<tr><td>7</td><td><b>粘贴任意文件</b></td><td>原版粘贴只收图片，PDF、表格只能拖拽</td><td><code>dist/index.html</code></td></tr>
+<tr><td>8</td><td><b>公式用 LaTeX</b></td><td>网页端能渲染 KaTeX，但 Claude 默认按终端习惯写纯文本公式</td><td><code>claude-runtime.provider.js</code></td></tr>
+</tbody></table></div>
+<p>每一项的具体代码见 <a href="#code">第 8 节</a>。</p>
+
+<h2 id="safety"><span class="n">3</span>安全须知</h2>
+<div class="callout danger"><b class="t">不要对局域网开放</b>
+免登录模式下，服务端把任何请求都当成同一个用户；「打开文件」和「额度」接口也没有鉴权。只要别人能连上这个端口，就等于能在你的电脑上让 Claude 执行命令。<code>.env</code> 里的 <code>HOST=127.0.0.1</code> 一定不要改成 <code>0.0.0.0</code>。</div>
+<p>如果确实要从手机或别的电脑访问，先恢复登录：删掉 <code>.env</code> 里的 <code>VITE_IS_PLATFORM=true</code>，并把 <code>dist/index.html</code> 恢复成 <code>index.html.orig</code>（会丢掉额度胶囊等前端补丁，需要的话只去掉 <code>&lt;title&gt;</code> 后面那行写 <code>auth-token</code> 的脚本）。</p>
+
+<h2 id="ops"><span class="n">4</span>日常运维</h2>
+<div class="codewrap"><button class="copy" type="button">复制</button><pre># 看日志
+tail -f ~/.cloudcli/server.log
+
+# 重启（改了补丁之后）
+launchctl kickstart -k gui/$(id -u)/com.cloudcli.server
+
+# 看 3001 端口被谁占着
+lsof -nP -iTCP:3001 -sTCP:LISTEN
+
+# 卸载（加 --purge 连 ~/.cloudcli 一起删）
+./uninstall.sh</pre></div>
+<div class="callout warn"><b class="t">不要 npm update -g</b>
+升级会把补丁全部冲掉，而且前端注入脚本依赖 1.37.3 的页面结构。要升级，先对照 <code>patches.diff</code> 逐个确认能打上，再把数据库里的 <code>scan_state.last_scanned_at</code> 置空触发重扫、重启服务。</div>
+<h3>数据都在哪</h3>
+<div class="tbl"><table>
+<thead><tr><th>位置</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td><code>~/.claude/projects/</code></td><td>真正的对话记录（JSONL），终端 claude、CloudCLI、桌面客户端共用</td></tr>
+<tr><td><code>~/.cloudcli/auth.db</code></td><td>CloudCLI 自己的索引：用户、会话列表、设置</td></tr>
+<tr><td><code>~/.cloudcli/assets/</code></td><td>聊天里粘贴 / 上传的图片</td></tr>
+<tr><td><code>~/.cloudcli/server.log</code></td><td>服务日志</td></tr>
+<tr><td><code>~/Library/LaunchAgents/com.cloudcli.server.plist</code></td><td>开机自启配置</td></tr>
+</tbody></table></div>
+
+<h2 id="pitfalls"><span class="n">5</span>踩过的坑</h2>
+<ul>
+  <li><b>新版 npm 提示原生模块的安装脚本未获批准</b>（bcrypt、better-sqlite3、node-pty）：可以忽略，这几个包自带 macOS 预编译文件。只有以后换了 Node 大版本、启动报错时，才需要进包目录运行 <code>npm rebuild bcrypt better-sqlite3 node-pty</code>。</li>
+  <li><b>EADDRINUSE（端口被占用）</b>：通常是之前手动起的实例还在。用 <code>lsof -nP -t -iTCP:3001 -sTCP:LISTEN</code> 找到 PID 再 kill；<code>pkill -f cloudcli</code> 不一定杀得干净。旧实例占着端口时 launchd 会反复重启。</li>
+  <li><b>用 nohup 后台启动会被回收</b>：所以改成了 launchd 常驻。launchd 不读 <code>.zshrc</code>、不加载 nvm，plist 里 node 和 claude 的路径必须是绝对路径；需要代理也得在 plist 里单独写。</li>
+  <li><b>首次引导的 Git 配置页过不去</b>：没有跳过按钮，邮箱校验也很严。安装脚本直接调 <code>/api/user/complete-onboarding</code> 跳过了。</li>
+  <li><b>会话链接里的 id 和 JSONL 文件名对不上</b>：<code>localhost:3001/session/&lt;id&gt;</code> 用的是 CloudCLI 自己的编号。对应关系在 <code>auth.db</code> 的 <code>sessions</code> 表（<code>session_id</code> / <code>provider_session_id</code> / <code>jsonl_path</code>）。</li>
+  <li><b>同一个对话开多个标签页</b>：每个页面都会起一个 Claude 进程，长任务会互相干扰。一个对话只开一个页面。</li>
+  <li><b>网页端会话没有 Chrome 扩展工具</b>：需要操作 Chrome 时，去终端用 <code>claude --chrome</code>。</li>
+  <li><b>额度胶囊只对订阅登录有效</b>：用 API key、Bedrock、Vertex 登录时显示不可用。</li>
+</ul>
+
+<h2 id="desktop"><span class="n">6</span>导入 Claude 桌面客户端</h2>
+<p>CloudCLI 和桌面客户端读的是同一批对话记录，但客户端左侧列表只显示它自己建过的会话。<code>tools/import_to_claude_desktop.py</code> 会为其余对话补一个列表项（只新建小 JSON 文件，不改对话记录），之后在客户端里也能接着聊。</p>
+<div class="codewrap"><button class="copy" type="button">复制</button><pre>python3 tools/import_to_claude_desktop.py          # 试运行：统计 + 预览标题
+python3 tools/import_to_claude_desktop.py --apply  # 写入</pre></div>
+<p>写入后按 <b>⌘Q</b> 完全退出 Claude 客户端再打开。标题优先用原有标题，没有就取第一句话的前 50 个字；<code>claude -p</code> 脚本产生的会话、工作目录已删除的会话会自动跳过。撤销：删掉文件里带 <code>"importedBy": "cloudcli-kit"</code> 的 <code>local_*.json</code>。</p>
+<div class="callout warn"><b class="t">别两边同时聊同一个会话</b>
+CloudCLI 和客户端会往同一个记录文件里写，同时发消息会让记录错乱。</div>
+
+<h2 id="manual"><span class="n">7</span>手动搭建（不用脚本）</h2>
+<p>想自己一步步来，或者不是 macOS：</p>
+<ol>
+  <li><code>npm install -g @cloudcli-ai/cloudcli@1.37.3</code>，然后 <code>PKG="$(npm root -g)/@cloudcli-ai/cloudcli"</code>。</li>
+  <li>把压缩包里 <code>files/</code> 下的文件按相同相对路径覆盖进 <code>$PKG</code>（或在 <code>$PKG</code> 里 <code>patch -p1 &lt; patches.diff</code>）。其中 <code>.env</code> 内容：
+<div class="codewrap"><button class="copy" type="button">复制</button><pre>VITE_IS_PLATFORM=true
+HOST=127.0.0.1
+</pre></div></li>
+  <li>前台试跑：<code>node "$PKG/dist-server/server/modules/cli/cli.js"</code>，打开 localhost:3001。</li>
+  <li>注册占位用户并跳过引导（密码随机，之后用不到）：
+<div class="codewrap"><button class="copy" type="button">复制</button><pre>curl -X POST localhost:3001/api/auth/register -H 'Content-Type: application/json' \
+  -d "{\"username\":\"local\",\"password\":\"$(openssl rand -hex 16)\"}"
+curl -X POST localhost:3001/api/user/complete-onboarding -H 'Content-Type: application/json' -d '{}'</pre></div></li>
+  <li>常驻：macOS 用 launchd（见下面 install.sh 里生成的 plist），Linux 可写一个 <code>systemd --user</code> 服务。文件菜单里的「打开」依赖 macOS 的 <code>open</code> 命令，其余功能跨平台。</li>
+</ol>
+<details class="file"><summary><code>install.sh</code><span class="note">一键安装脚本全文</span></summary><div class="codewrap"><button class="copy" type="button">复制</button><pre>#!/bin/bash
+# CloudCLI 本机定制版一键安装（macOS）
+#   用法:  ./install.sh                         # 不走代理
+#          PROXY=http://127.0.0.1:7897 ./install.sh   # Claude 需要走本地代理时
+# 做的事: 装 @cloudcli-ai/cloudcli@1.37.3 → 覆盖补丁文件 → 写 launchd 常驻 → 注册占位用户并跳过引导
+# 前提:   已装 Node 20+ 和 Claude Code CLI，并且终端里 `claude` 已登录（订阅账号）
+set -euo pipefail
+
+VERSION=1.37.3
+PORT=3001
+LABEL=com.cloudcli.server
+KIT=&quot;$(cd &quot;$(dirname &quot;$0&quot;)&quot; &amp;&amp; pwd)&quot;
+PLIST=&quot;$HOME/Library/LaunchAgents/$LABEL.plist&quot;
+
+say() { printf &#x27;\033[1;34m==&gt;\033[0m %s\n&#x27; &quot;$*&quot;; }
+die() { printf &#x27;\033[1;31m错误:\033[0m %s\n&#x27; &quot;$*&quot; &gt;&amp;2; exit 1; }
+
+[[ &quot;$(uname)&quot; == Darwin ]] || die &quot;这个脚本只支持 macOS（launchd、open 命令都依赖它）&quot;
+NODE=&quot;$(command -v node)&quot; || die &quot;找不到 node，请先装 Node 20+（推荐 nvm）&quot;
+command -v npm &gt;/dev/null || die &quot;找不到 npm&quot;
+CLAUDE=&quot;$(command -v claude)&quot; || die &quot;找不到 claude，请先装 Claude Code CLI 并登录&quot;
+NODE_MAJOR=&quot;$(&quot;$NODE&quot; -p &#x27;process.versions.node.split(&quot;.&quot;)[0]&#x27;)&quot;
+(( NODE_MAJOR &gt;= 20 )) || die &quot;Node 版本太旧（$(&quot;$NODE&quot; -v)），需要 20 以上&quot;
+
+# 1. 安装固定版本：补丁依赖 1.37.3 的文件结构，别装最新版
+say &quot;安装 @cloudcli-ai/cloudcli@$VERSION&quot;
+npm install -g &quot;@cloudcli-ai/cloudcli@$VERSION&quot;
+PKG=&quot;$(npm root -g)/@cloudcli-ai/cloudcli&quot;
+[[ &quot;$(&quot;$NODE&quot; -p &quot;require(&#x27;$PKG/package.json&#x27;).version&quot;)&quot; == &quot;$VERSION&quot; ]] || die &quot;装上的版本不是 $VERSION&quot;
+
+# 2. 覆盖补丁文件，原文件第一次覆盖前备份成 *.orig
+say &quot;应用补丁到 $PKG&quot;
+cd &quot;$KIT/files&quot;
+find . -type f | while read -r f; do
+  dst=&quot;$PKG/${f#./}&quot;
+  mkdir -p &quot;$(dirname &quot;$dst&quot;)&quot;
+  [[ -f &quot;$dst&quot; &amp;&amp; ! -f &quot;$dst.orig&quot; ]] &amp;&amp; cp &quot;$dst&quot; &quot;$dst.orig&quot;
+  cp &quot;$f&quot; &quot;$dst&quot;
+done
+cd &quot;$KIT&quot;
+
+# 3. launchd 常驻。launchd 不读 shell 配置，所以 node / claude 的目录都写成绝对路径
+say &quot;写入 $PLIST&quot;
+mkdir -p &quot;$HOME/.cloudcli&quot; &quot;$HOME/Library/LaunchAgents&quot;
+PATH_VALUE=&quot;$(dirname &quot;$NODE&quot;):$(dirname &quot;$CLAUDE&quot;):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin&quot;
+PROXY_XML=&quot;&quot;
+if [[ -n &quot;${PROXY:-}&quot; ]]; then
+  for k in http_proxy https_proxy HTTP_PROXY HTTPS_PROXY; do
+    PROXY_XML+=&quot;    &lt;key&gt;$k&lt;/key&gt;&lt;string&gt;$PROXY&lt;/string&gt;&quot;$&#x27;\n&#x27;
+  done
+  for k in no_proxy NO_PROXY; do
+    PROXY_XML+=&quot;    &lt;key&gt;$k&lt;/key&gt;&lt;string&gt;localhost,127.0.0.1,::1&lt;/string&gt;&quot;$&#x27;\n&#x27;
+  done
+fi
+cat &gt; &quot;$PLIST&quot; &lt;&lt;EOF
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!DOCTYPE plist PUBLIC &quot;-//Apple//DTD PLIST 1.0//EN&quot; &quot;http://www.apple.com/DTDs/PropertyList-1.0.dtd&quot;&gt;
+&lt;plist version=&quot;1.0&quot;&gt;
+&lt;dict&gt;
+  &lt;key&gt;Label&lt;/key&gt;&lt;string&gt;$LABEL&lt;/string&gt;
+  &lt;key&gt;ProgramArguments&lt;/key&gt;
+  &lt;array&gt;
+    &lt;string&gt;$NODE&lt;/string&gt;
+    &lt;string&gt;$PKG/dist-server/server/modules/cli/cli.js&lt;/string&gt;
+  &lt;/array&gt;
+  &lt;key&gt;WorkingDirectory&lt;/key&gt;&lt;string&gt;$HOME&lt;/string&gt;
+  &lt;key&gt;EnvironmentVariables&lt;/key&gt;
+  &lt;dict&gt;
+    &lt;key&gt;PATH&lt;/key&gt;&lt;string&gt;$PATH_VALUE&lt;/string&gt;
+    &lt;key&gt;HOME&lt;/key&gt;&lt;string&gt;$HOME&lt;/string&gt;
+$PROXY_XML  &lt;/dict&gt;
+  &lt;key&gt;RunAtLoad&lt;/key&gt;&lt;true/&gt;
+  &lt;key&gt;KeepAlive&lt;/key&gt;&lt;true/&gt;
+  &lt;key&gt;ThrottleInterval&lt;/key&gt;&lt;integer&gt;5&lt;/integer&gt;
+  &lt;key&gt;StandardOutPath&lt;/key&gt;&lt;string&gt;$HOME/.cloudcli/server.log&lt;/string&gt;
+  &lt;key&gt;StandardErrorPath&lt;/key&gt;&lt;string&gt;$HOME/.cloudcli/server.log&lt;/string&gt;
+&lt;/dict&gt;
+&lt;/plist&gt;
+EOF
+plutil -lint &quot;$PLIST&quot; &gt;/dev/null
+
+# 端口被旧实例占着时 launchd 会无限重启，先清掉
+OLD_PID=&quot;$(lsof -nP -t -iTCP:$PORT -sTCP:LISTEN 2&gt;/dev/null || true)&quot;
+launchctl bootout &quot;gui/$(id -u)/$LABEL&quot; 2&gt;/dev/null || true
+[[ -n &quot;$OLD_PID&quot; ]] &amp;&amp; { say &quot;结束占用 $PORT 端口的旧进程 $OLD_PID&quot;; kill $OLD_PID 2&gt;/dev/null || true; sleep 1; }
+launchctl bootstrap &quot;gui/$(id -u)&quot; &quot;$PLIST&quot;
+
+say &quot;等待服务启动&quot;
+for _ in $(seq 1 30); do
+  curl -fsS &quot;http://127.0.0.1:$PORT/&quot; &gt;/dev/null 2&gt;&amp;1 &amp;&amp; break
+  sleep 1
+done
+curl -fsS &quot;http://127.0.0.1:$PORT/&quot; &gt;/dev/null 2&gt;&amp;1 || die &quot;服务没起来，看日志: tail -50 ~/.cloudcli/server.log&quot;
+
+# 4. 注册占位用户（免登录模式下所有请求都映射到第一个用户，密码随机生成后不再使用）
+say &quot;注册占位用户 local 并跳过首次引导&quot;
+PW=&quot;$(openssl rand -hex 16)&quot;
+curl -fsS -X POST &quot;http://127.0.0.1:$PORT/api/auth/register&quot; \
+  -H &#x27;Content-Type: application/json&#x27; -d &quot;{\&quot;username\&quot;:\&quot;local\&quot;,\&quot;password\&quot;:\&quot;$PW\&quot;}&quot; &gt;/dev/null 2&gt;&amp;1 \
+  || echo &quot;   （已有用户，跳过注册）&quot;
+curl -fsS -X POST &quot;http://127.0.0.1:$PORT/api/user/complete-onboarding&quot; \
+  -H &#x27;Authorization: Bearer local&#x27; -H &#x27;Content-Type: application/json&#x27; -d &#x27;{}&#x27; &gt;/dev/null 2&gt;&amp;1 || true
+
+say &quot;完成 → 打开 http://localhost:$PORT&quot;
+echo &quot;   日志:   tail -f ~/.cloudcli/server.log&quot;
+echo &quot;   重启:   launchctl kickstart -k gui/\$(id -u)/$LABEL&quot;
+echo &quot;   卸载:   ./uninstall.sh&quot;
+open &quot;http://localhost:$PORT&quot; || true
+</pre></div></details>
+
+<h2 id="code"><span class="n">8</span>全部代码</h2>
+<p>相对原版 1.37.3 的完整 diff：7 个改动文件 + 2 个新增文件，点开查看。压缩包里 <code>patches.diff</code> 是同一份内容，<code>files/</code> 是打完补丁的完整文件。</p>
+<details class="file"><summary><code>dist-server/server/index.js</code><span class="st"><b class="pa">+28</b> <b class="pd">−0</b></span><span class="note">挂载 /api/claude-usage 和 /api/local-file/* 路由</span></summary>
+<div class="codewrap"><button class="copy" type="button">复制</button><pre class="diff"><span class="h">--- a/dist-server/server/index.js</span>
+<span class="h">+++ b/dist-server/server/index.js</span>
+<span class="at">@@ -33,6 +33,8 @@</span>
+ import { browserUseService } from &#x27;./modules/browser-use/browser-use.service.js&#x27;;
+ import { initializeDatabase, sessionsDb } from &#x27;./modules/database/index.js&#x27;;
+ import { configureWebPush } from &#x27;./modules/notifications/index.js&#x27;;
+<span class="add">+import { getClaudeUsage } from &#x27;./claude-usage.patch.js&#x27;; // PATCHED (local)</span>
+<span class="add">+import { listApps, openTarget, renderPreview } from &#x27;./local-file.patch.js&#x27;; // PATCHED (local)</span>
+ const __dirname = getModuleDirectory(import.meta.url);
+ // The server source runs from /server, while the compiled output runs from /dist-server/server.
+ // Resolving the app root once keeps every repo-level lookup below aligned across both layouts.
+<span class="dim">\ No newline at end of file</span>
+<span class="at">@@ -152,6 +154,32 @@</span>
+ // Agent API Routes (uses API key authentication)
+ app.use(&#x27;/api/agent&#x27;, agentRoutes);
+ app.use(&#x27;/api/voice&#x27;, authenticateToken, voiceRoutes);
+<span class="add">+// PATCHED (local): Claude plan usage meter for the web UI widget.</span>
+<span class="add">+app.get(&#x27;/api/claude-usage&#x27;, async (req, res) =&gt; {</span>
+<span class="add">+    try {</span>
+<span class="add">+        const u = await getClaudeUsage(req.query.force === &#x27;1&#x27;);</span>
+<span class="add">+        const rl = u.rate_limits || {};</span>
+<span class="add">+        res.json({</span>
+<span class="add">+            fetchedAt: u.fetchedAt, cached: Boolean(u.cached), subscription_type: u.subscription_type,</span>
+<span class="add">+            available: Boolean(u.rate_limits_available),</span>
+<span class="add">+            limits: Array.isArray(rl.limits) ? rl.limits : null,</span>
+<span class="add">+            five_hour: rl.five_hour ?? null, seven_day: rl.seven_day ?? null,</span>
+<span class="add">+            extra_usage: rl.extra_usage ? { is_enabled: rl.extra_usage.is_enabled, utilization: rl.extra_usage.utilization } : null,</span>
+<span class="add">+        });</span>
+<span class="add">+    } catch (error) {</span>
+<span class="add">+        res.status(502).json({ error: error instanceof Error ? error.message : String(error) });</span>
+<span class="add">+    }</span>
+<span class="add">+});</span>
+<span class="add">+// PATCHED (local): open local files from the chat UI.</span>
+<span class="add">+app.get(&#x27;/api/local-file/apps&#x27;, (_req, res) =&gt; { res.json({ apps: listApps() }); });</span>
+<span class="add">+app.post(&#x27;/api/local-file/open&#x27;, express.json(), async (req, res) =&gt; {</span>
+<span class="add">+    try { res.json(await openTarget({ path: req.body?.path, mode: req.body?.mode, app: req.body?.app, dry: req.body?.dry === true })); }</span>
+<span class="add">+    catch (e) { res.status(e.status || 500).json({ error: e.message }); }</span>
+<span class="add">+});</span>
+<span class="add">+app.get(&#x27;/api/local-file/preview&#x27;, (req, res) =&gt; {</span>
+<span class="add">+    try { res.type(&#x27;html&#x27;).send(renderPreview(String(req.query.path || &#x27;&#x27;))); }</span>
+<span class="add">+    catch (e) { res.status(e.status || 500).type(&#x27;text&#x27;).send(e.message); }</span>
+<span class="add">+});</span>
+ // Serve public files (like api-docs.html)
+ app.use(express.static(path.join(APP_ROOT, &#x27;public&#x27;)));
+ // Static files served after API routes
+<span class="dim">\ No newline at end of file</span></pre></div></details>
+<details class="file"><summary><code>dist-server/server/modules/providers/list/claude/claude-models.provider.js</code><span class="st"><b class="pa">+9</b> <b class="pd">−8</b></span><span class="note">模型标签带版本号</span></summary>
+<div class="codewrap"><button class="copy" type="button">复制</button><pre class="diff"><span class="h">--- a/dist-server/server/modules/providers/list/claude/claude-models.provider.js</span>
+<span class="h">+++ b/dist-server/server/modules/providers/list/claude/claude-models.provider.js</span>
+<span class="at">@@ -1,3 +1,4 @@</span>
+<span class="add">+// PATCHED (local): model labels carry version numbers (aliases unchanged).</span>
+ import { readFile } from &#x27;node:fs/promises&#x27;;
+ import { sessionsDb } from &#x27;../../../../modules/database/index.js&#x27;;
+ import { buildDefaultProviderCurrentActiveModel } from &#x27;../../../../shared/utils.js&#x27;;
+<span class="dim">\ No newline at end of file</span>
+<span class="at">@@ -31,7 +32,7 @@</span>
+         {
+             value: &#x27;best&#x27;,
+             label: &#x27;Best available&#x27;,
+<span class="del">-            description: &#x27;Use Fable 5 when available, otherwise the latest Opus model.&#x27;,</span>
+<span class="add">+            description: &#x27;Use Fable 5.1 when available, otherwise Opus 5.5.&#x27;,</span>
+             effort: {
+                 default: &#x27;high&#x27;,
+                 values: [
+<span class="dim">\ No newline at end of file</span>
+<span class="at">@@ -46,7 +47,7 @@</span>
+         },
+         {
+             value: &#x27;fable&#x27;,
+<span class="del">-            label: &#x27;Fable 5&#x27;,</span>
+<span class="add">+            label: &#x27;Fable 5.1&#x27;,</span>
+             description: &#x27;Most capable Claude model for the hardest, longest-running tasks.&#x27;,
+             effort: {
+                 default: &#x27;high&#x27;,
+<span class="dim">\ No newline at end of file</span>
+<span class="at">@@ -62,7 +63,7 @@</span>
+         },
+         {
+             value: &#x27;sonnet&#x27;,
+<span class="del">-            label: &#x27;Sonnet&#x27;,</span>
+<span class="add">+            label: &#x27;Sonnet 5&#x27;,</span>
+             description: &#x27;Latest Sonnet model for everyday coding tasks.&#x27;,
+             effort: {
+                 default: &#x27;high&#x27;,
+<span class="dim">\ No newline at end of file</span>
+<span class="at">@@ -78,7 +79,7 @@</span>
+         },
+         {
+             value: &#x27;sonnet[1m]&#x27;,
+<span class="del">-            label: &#x27;Sonnet (1M context)&#x27;,</span>
+<span class="add">+            label: &#x27;Sonnet 5 (1M context)&#x27;,</span>
+             description: &#x27;Latest Sonnet model with a 1M context window.&#x27;,
+             effort: {
+                 default: &#x27;high&#x27;,
+<span class="dim">\ No newline at end of file</span>
+<span class="at">@@ -94,7 +95,7 @@</span>
+         },
+         {
+             value: &#x27;opus&#x27;,
+<span class="del">-            label: &#x27;Opus&#x27;,</span>
+<span class="add">+            label: &#x27;Opus 5.5&#x27;,</span>
+             description: &#x27;Latest Opus model for complex reasoning and coding tasks.&#x27;,
+             effort: {
+                 default: &#x27;high&#x27;,
+<span class="dim">\ No newline at end of file</span>
+<span class="at">@@ -110,7 +111,7 @@</span>
+         },
+         {
+             value: &#x27;opus[1m]&#x27;,
+<span class="del">-            label: &#x27;Opus (1M context)&#x27;,</span>
+<span class="add">+            label: &#x27;Opus 5.5 (1M context)&#x27;,</span>
+             description: &#x27;Latest Opus model with a 1M context window.&#x27;,
+             effort: {
+                 default: &#x27;high&#x27;,
+<span class="dim">\ No newline at end of file</span>
+<span class="at">@@ -126,12 +127,12 @@</span>
+         },
+         {
+             value: &#x27;haiku&#x27;,
+<span class="del">-            label: &#x27;Haiku&#x27;,</span>
+<span class="add">+            label: &#x27;Haiku 4.5&#x27;,</span>
+             description: &#x27;Fast and efficient Claude model for simple tasks.&#x27;,
+         },
+         {
+             value: &#x27;opusplan&#x27;,
+<span class="del">-            label: &#x27;Opus Plan&#x27;,</span>
+<span class="add">+            label: &#x27;Opus 5.5 Plan&#x27;,</span>
+             description: &#x27;Use Opus while planning, then switch to Sonnet for execution.&#x27;,
+             effort: {
+                 default: &#x27;high&#x27;,
+<span class="dim">\ No newline at end of file</span></pre></div></details>
+<details class="file"><summary><code>dist-server/server/modules/providers/list/claude/claude-runtime.provider.js</code><span class="st"><b class="pa">+9</b> <b class="pd">−1</b></span><span class="note">系统提示追加：公式用 LaTeX</span></summary>
+<div class="codewrap"><button class="copy" type="button">复制</button><pre class="diff"><span class="h">--- a/dist-server/server/modules/providers/list/claude/claude-runtime.provider.js</span>
+<span class="h">+++ b/dist-server/server/modules/providers/list/claude/claude-runtime.provider.js</span>
+<span class="at">@@ -219,9 +219,17 @@</span>
+     sdkOptions.disallowedTools = settings.disallowedTools || [];
+     sdkOptions.model = options.model || CLAUDE_PREDEFINED_MODELS.DEFAULT;
+     applyClaudeEffort(sdkOptions, resolveClaudeEffort(sdkOptions.model, effort, options.effortModels || CLAUDE_PREDEFINED_MODELS));
+<span class="add">+    // PATCHED (local): the web UI renders Markdown + KaTeX, so ask for LaTeX math instead of plain-text formulas.</span>
+<span class="add">+    const CLOUDCLI_MATH_NOTE = [</span>
+<span class="add">+        &#x27;Rendering note: your replies are displayed in a web chat UI (CloudCLI) that renders GitHub-flavored Markdown with KaTeX, not in a terminal.&#x27;,</span>
+<span class="add">+        &#x27;Write ALL mathematics as LaTeX: inline math as $...$ and display equations as $$...$$ on their own lines.&#x27;,</span>
+<span class="add">+        &#x27;Never put formulas in plain-text or ```text code blocks, and do not substitute Unicode pseudo-math (Σ, ∫, ², ≈, ·) for LaTeX.&#x27;,</span>
+<span class="add">+        &#x27;Code blocks are only for code, commands and file contents. Tables, headings, lists and Mermaid diagrams render normally.&#x27;,</span>
+<span class="add">+    ].join(&#x27; &#x27;);</span>
+     sdkOptions.systemPrompt = {
+         type: &#x27;preset&#x27;,
+<span class="del">-        preset: &#x27;claude_code&#x27;</span>
+<span class="add">+        preset: &#x27;claude_code&#x27;,</span>
+<span class="add">+        append: CLOUDCLI_MATH_NOTE</span>
+     };
+     sdkOptions.settingSources = [&#x27;project&#x27;, &#x27;user&#x27;, &#x27;local&#x27;];
+     // The SDK resumes with the provider-native session id, never the app id.
+<span class="dim">\ No newline at end of file</span></pre></div></details>
+<details class="file"><summary><code>dist-server/server/modules/providers/list/claude/claude-session-synchronizer.provider.js</code><span class="st"><b class="pa">+84</b> <b class="pd">−96</b></span><span class="note">标题规则与客户端一致，隐藏 claude -p 脚本会话</span></summary>
+<div class="codewrap"><button class="copy" type="button">复制</button><pre class="diff"><span class="h">--- a/dist-server/server/modules/providers/list/claude/claude-session-synchronizer.provider.js</span>
+<span class="h">+++ b/dist-server/server/modules/providers/list/claude/claude-session-synchronizer.provider.js</span>
+<span class="at">@@ -1,141 +1,129 @@</span>
+<span class="add">+// PATCHED (local): title priority = Claude custom-title &gt; ai-title &gt; first real prompt.</span>
+<span class="add">+// Original kept as *.orig. Only Claude sessions are indexed.</span>
+ import os from &#x27;node:os&#x27;;
+ import path from &#x27;node:path&#x27;;
+<span class="add">+import fs from &#x27;node:fs&#x27;;</span>
+<span class="add">+import readline from &#x27;node:readline&#x27;;</span>
+ import { readFile } from &#x27;node:fs/promises&#x27;;
+ import { sessionsDb } from &#x27;../../../../modules/database/index.js&#x27;;
+<span class="del">-import { buildLookupMap, extractFirstValidJsonlData, findFilesRecursivelyCreatedAfter, normalizeSessionName, readFileTimestamps, } from &#x27;../../../../shared/utils.js&#x27;;</span>
+<span class="del">-/**</span>
+<span class="del">- * Session indexer for Claude transcript artifacts.</span>
+<span class="del">- */</span>
+<span class="add">+import { extractFirstValidJsonlData, findFilesRecursivelyCreatedAfter, normalizeSessionName, readFileTimestamps, } from &#x27;../../../../shared/utils.js&#x27;;</span>
+<span class="add">+const isMeaningfulPrompt = (text) =&gt; {</span>
+<span class="add">+    const t = typeof text === &#x27;string&#x27; ? text.trim() : &#x27;&#x27;;</span>
+<span class="add">+    return t.length &gt; 0 &amp;&amp; !t.startsWith(&#x27;/&#x27;) &amp;&amp; !t.startsWith(&#x27;&lt;&#x27;);</span>
+<span class="add">+};</span>
+<span class="add">+const textOfUserMessage = (message) =&gt; {</span>
+<span class="add">+    if (!message || message.role !== &#x27;user&#x27;) return undefined;</span>
+<span class="add">+    const c = message.content;</span>
+<span class="add">+    if (typeof c === &#x27;string&#x27;) return c;</span>
+<span class="add">+    if (Array.isArray(c)) {</span>
+<span class="add">+        for (const block of c) {</span>
+<span class="add">+            if (block &amp;&amp; block.type === &#x27;text&#x27; &amp;&amp; typeof block.text === &#x27;string&#x27;) return block.text;</span>
+<span class="add">+        }</span>
+<span class="add">+    }</span>
+<span class="add">+    return undefined;</span>
+<span class="add">+};</span>
+<span class="add">+async function buildFirstPromptMap(filePath) {</span>
+<span class="add">+    const lookup = new Map();</span>
+<span class="add">+    lookup.interactiveIds = new Set();</span>
+<span class="add">+    try {</span>
+<span class="add">+        const rl = readline.createInterface({ input: fs.createReadStream(filePath), crlfDelay: Infinity });</span>
+<span class="add">+        for await (const line of rl) {</span>
+<span class="add">+            const trimmed = line.trim();</span>
+<span class="add">+            if (!trimmed) continue;</span>
+<span class="add">+            let parsed;</span>
+<span class="add">+            try { parsed = JSON.parse(trimmed); } catch { continue; }</span>
+<span class="add">+            const key = parsed.sessionId;</span>
+<span class="add">+            const value = parsed.display;</span>
+<span class="add">+            if (typeof key === &#x27;string&#x27;) lookup.interactiveIds.add(key);</span>
+<span class="add">+            if (typeof key === &#x27;string&#x27; &amp;&amp; isMeaningfulPrompt(value) &amp;&amp; !lookup.has(key)) {</span>
+<span class="add">+                lookup.set(key, value.trim());</span>
+<span class="add">+            }</span>
+<span class="add">+        }</span>
+<span class="add">+    } catch { /* history.jsonl missing */ }</span>
+<span class="add">+    return lookup;</span>
+<span class="add">+}</span>
+ export class ClaudeSessionSynchronizer {
+     provider = &#x27;claude&#x27;;
+     claudeHome = path.join(os.homedir(), &#x27;.claude&#x27;);
+<span class="del">-    /**</span>
+<span class="del">-     * Returns true when a JSONL file is a subagent transcript or tool result</span>
+<span class="del">-     * rather than a top-level session.</span>
+<span class="del">-     *</span>
+<span class="del">-     * Claude stores subagent transcripts under a `subagents/` directory and</span>
+<span class="del">-     * tool results under a `tool-results/` directory, e.g.</span>
+<span class="del">-     * `~/.claude/projects/&lt;encoded-cwd&gt;/&lt;session-id&gt;/subagents/agent-&lt;id&gt;.jsonl`.</span>
+<span class="del">-     * Those files repeat the parent session&#x27;s `sessionId`, so indexing them as</span>
+<span class="del">-     * standalone sessions overwrites the parent row&#x27;s `jsonl_path` and corrupts</span>
+<span class="del">-     * the main session record. The recursive scan in `synchronize()` reaches</span>
+<span class="del">-     * them, so both entry points must skip them.</span>
+<span class="del">-     */</span>
+     isSubagentTranscript(filePath) {
+         const pathParts = path.normalize(filePath).split(path.sep);
+         return pathParts.includes(&#x27;subagents&#x27;) || pathParts.includes(&#x27;tool-results&#x27;);
+     }
+<span class="del">-    /**</span>
+<span class="del">-     * Scans ~/.claude/projects and upserts discovered sessions into DB.</span>
+<span class="del">-     */</span>
+     async synchronize(since) {
+<span class="del">-        const nameMap = await buildLookupMap(path.join(this.claudeHome, &#x27;history.jsonl&#x27;), &#x27;sessionId&#x27;, &#x27;display&#x27;);</span>
+<span class="add">+        const nameMap = await buildFirstPromptMap(path.join(this.claudeHome, &#x27;history.jsonl&#x27;));</span>
+         const files = await findFilesRecursivelyCreatedAfter(path.join(this.claudeHome, &#x27;projects&#x27;), &#x27;.jsonl&#x27;, since ?? null);
+         let processed = 0;
+         for (const filePath of files) {
+<span class="del">-            if (this.isSubagentTranscript(filePath)) {</span>
+<span class="del">-                continue;</span>
+<span class="del">-            }</span>
+<span class="add">+            if (this.isSubagentTranscript(filePath)) continue;</span>
+             const parsed = await this.processSessionFile(filePath, nameMap);
+<span class="del">-            if (!parsed) {</span>
+<span class="del">-                continue;</span>
+<span class="del">-            }</span>
+<span class="add">+            if (!parsed) continue;</span>
+             const timestamps = await readFileTimestamps(filePath);
+             sessionsDb.createSession(parsed.sessionId, this.provider, parsed.projectPath, parsed.sessionName, timestamps.createdAt, timestamps.updatedAt, filePath);
+             processed += 1;
+         }
+         return processed;
+     }
+<span class="del">-    /**</span>
+<span class="del">-     * Parses and upserts one Claude session JSONL file.</span>
+<span class="del">-     */</span>
+     async synchronizeFile(filePath) {
+<span class="del">-        if (!filePath.endsWith(&#x27;.jsonl&#x27;)) {</span>
+<span class="del">-            return null;</span>
+<span class="del">-        }</span>
+<span class="del">-        if (this.isSubagentTranscript(filePath)) {</span>
+<span class="del">-            return null;</span>
+<span class="del">-        }</span>
+<span class="del">-        const nameMap = await buildLookupMap(path.join(this.claudeHome, &#x27;history.jsonl&#x27;), &#x27;sessionId&#x27;, &#x27;display&#x27;);</span>
+<span class="add">+        if (!filePath.endsWith(&#x27;.jsonl&#x27;)) return null;</span>
+<span class="add">+        if (this.isSubagentTranscript(filePath)) return null;</span>
+<span class="add">+        const nameMap = await buildFirstPromptMap(path.join(this.claudeHome, &#x27;history.jsonl&#x27;));</span>
+         const parsed = await this.processSessionFile(filePath, nameMap);
+<span class="del">-        if (!parsed) {</span>
+<span class="del">-            return null;</span>
+<span class="del">-        }</span>
+<span class="add">+        if (!parsed) return null;</span>
+         const timestamps = await readFileTimestamps(filePath);
+         return sessionsDb.createSession(parsed.sessionId, this.provider, parsed.projectPath, parsed.sessionName, timestamps.createdAt, timestamps.updatedAt, filePath);
+     }
+<span class="del">-    /**</span>
+<span class="del">-     * Extracts session metadata from one Claude JSONL session file.</span>
+<span class="del">-     */</span>
+     async processSessionFile(filePath, nameMap) {
+         const parsed = await extractFirstValidJsonlData(filePath, (rawData) =&gt; {
+             const data = rawData;
+             const sessionId = typeof data.sessionId === &#x27;string&#x27; ? data.sessionId : undefined;
+             const projectPath = typeof data.cwd === &#x27;string&#x27; ? data.cwd : undefined;
+<span class="del">-            if (!sessionId || !projectPath) {</span>
+<span class="del">-                return null;</span>
+<span class="del">-            }</span>
+<span class="del">-            return {</span>
+<span class="del">-                sessionId,</span>
+<span class="del">-                projectPath,</span>
+<span class="del">-            };</span>
+<span class="add">+            if (!sessionId || !projectPath) return null;</span>
+<span class="add">+            return { sessionId, projectPath };</span>
+         });
+<span class="del">-        if (!parsed) {</span>
+<span class="del">-            return null;</span>
+<span class="del">-        }</span>
+<span class="del">-        // App-created sessions are keyed by an app id, so disk-discovered provider</span>
+<span class="del">-        // ids must be resolved through the provider-id mapping first.</span>
+<span class="del">-        const existingSession = sessionsDb.getSessionByProviderSessionId(parsed.sessionId)</span>
+<span class="del">-            ?? sessionsDb.getSessionById(parsed.sessionId);</span>
+<span class="del">-        const existingSessionName = existingSession?.custom_name;</span>
+<span class="del">-        if (existingSessionName &amp;&amp; existingSessionName !== &#x27;Untitled Claude Session&#x27;) {</span>
+<span class="del">-            return {</span>
+<span class="del">-                ...parsed,</span>
+<span class="del">-                sessionName: normalizeSessionName(existingSessionName, &#x27;Untitled Claude Session&#x27;),</span>
+<span class="del">-            };</span>
+<span class="del">-        }</span>
+<span class="del">-        let sessionName = nameMap.get(parsed.sessionId);</span>
+<span class="del">-        if (!sessionName) {</span>
+<span class="del">-            sessionName = await this.extractSessionAiTitleFromEnd(filePath, parsed.sessionId);</span>
+<span class="del">-        }</span>
+<span class="del">-        return {</span>
+<span class="del">-            ...parsed,</span>
+<span class="del">-            sessionName: normalizeSessionName(sessionName, &#x27;Untitled Claude Session&#x27;),</span>
+<span class="del">-        };</span>
+<span class="add">+        if (!parsed) return null;</span>
+<span class="add">+        const titles = await this.extractTitlesFromTranscript(filePath, parsed.sessionId);</span>
+<span class="add">+        // PATCHED (local): skip headless script sessions (claude -p / SDK one-shots).</span>
+<span class="add">+        // A real conversation has a desktop custom-title, an ai-title, an interactive</span>
+<span class="add">+        // &quot;mode&quot; record, an entry in history.jsonl, or was created by this app.</span>
+<span class="add">+        const existingRow = sessionsDb.getSessionByProviderSessionId(parsed.sessionId) ?? sessionsDb.getSessionById(parsed.sessionId);</span>
+<span class="add">+        const createdByApp = Boolean(existingRow &amp;&amp; existingRow.session_id !== existingRow.provider_session_id);</span>
+<span class="add">+        const interactive = Boolean(titles.customTitle || titles.aiTitle || titles.hasMode || nameMap.interactiveIds?.has(parsed.sessionId) || createdByApp);</span>
+<span class="add">+        if (!interactive) return null;</span>
+<span class="add">+        const sessionName = titles.customTitle || titles.aiTitle || nameMap.get(parsed.sessionId) || titles.firstPrompt;</span>
+<span class="add">+        return { ...parsed, sessionName: normalizeSessionName(sessionName, &#x27;Untitled Claude Session&#x27;) };</span>
+     }
+<span class="del">-    async extractSessionAiTitleFromEnd(filePath, sessionId) {</span>
+<span class="add">+    async extractTitlesFromTranscript(filePath, sessionId) {</span>
+<span class="add">+        const result = { customTitle: undefined, aiTitle: undefined, firstPrompt: undefined, hasMode: false };</span>
+         try {
+             const content = await readFile(filePath, &#x27;utf8&#x27;);
+             const lines = content.split(/\r?\n/);
+             for (let index = lines.length - 1; index &gt;= 0; index -= 1) {
+<span class="add">+                if (result.customTitle &amp;&amp; result.aiTitle &amp;&amp; result.hasMode) break;</span>
+                 const line = lines[index]?.trim();
+<span class="del">-                if (!line) {</span>
+<span class="del">-                    continue;</span>
+<span class="add">+                if (!line) continue;</span>
+<span class="add">+                let data;</span>
+<span class="add">+                try { data = JSON.parse(line); } catch { continue; }</span>
+<span class="add">+                if (typeof data.sessionId === &#x27;string&#x27; &amp;&amp; data.sessionId !== sessionId) continue;</span>
+<span class="add">+                if (data.type === &#x27;mode&#x27; || data.type === &#x27;permission-mode&#x27;) result.hasMode = true;</span>
+<span class="add">+                if (!result.customTitle &amp;&amp; data.type === &#x27;custom-title&#x27; &amp;&amp; typeof data.customTitle === &#x27;string&#x27; &amp;&amp; data.customTitle.trim()) {</span>
+<span class="add">+                    result.customTitle = data.customTitle.trim();</span>
+                 }
+<span class="del">-                let parsed;</span>
+<span class="del">-                try {</span>
+<span class="del">-                    parsed = JSON.parse(line);</span>
+<span class="add">+                if (!result.aiTitle &amp;&amp; data.type === &#x27;ai-title&#x27; &amp;&amp; typeof data.aiTitle === &#x27;string&#x27; &amp;&amp; data.aiTitle.trim()) {</span>
+<span class="add">+                    result.aiTitle = data.aiTitle.trim();</span>
+                 }
+<span class="del">-                catch {</span>
+<span class="del">-                    continue;</span>
+<span class="add">+            }</span>
+<span class="add">+            if (!result.customTitle &amp;&amp; !result.aiTitle) {</span>
+<span class="add">+                for (const raw of lines) {</span>
+<span class="add">+                    const line = raw.trim();</span>
+<span class="add">+                    if (!line) continue;</span>
+<span class="add">+                    let data;</span>
+<span class="add">+                    try { data = JSON.parse(line); } catch { continue; }</span>
+<span class="add">+                    if (data.type !== &#x27;user&#x27; || data.isSidechain) continue;</span>
+<span class="add">+                    const text = textOfUserMessage(data.message);</span>
+<span class="add">+                    if (isMeaningfulPrompt(text)) { result.firstPrompt = text.trim().slice(0, 200); break; }</span>
+                 }
+<span class="del">-                const data = parsed;</span>
+<span class="del">-                const eventType = typeof data.type === &#x27;string&#x27; ? data.type : undefined;</span>
+<span class="del">-                const eventSessionId = typeof data.sessionId === &#x27;string&#x27; ? data.sessionId : undefined;</span>
+<span class="del">-                const aiTitle = typeof data.aiTitle === &#x27;string&#x27; ? data.aiTitle : undefined;</span>
+<span class="del">-                const lastPrompt = typeof data.lastPrompt === &#x27;string&#x27; ? data.lastPrompt : undefined;</span>
+<span class="del">-                const claudeRenamedTitle = typeof data.customTitle === &#x27;string&#x27; ? data.customTitle : undefined;</span>
+<span class="del">-                if ((eventType === &#x27;ai-title&#x27; &amp;&amp; eventSessionId === sessionId &amp;&amp; aiTitle?.trim()) ||</span>
+<span class="del">-                    (eventType === &#x27;last-prompt&#x27; &amp;&amp; eventSessionId === sessionId &amp;&amp; lastPrompt?.trim()) ||</span>
+<span class="del">-                    (eventType === &quot;custom-title&quot; &amp;&amp; eventSessionId === sessionId &amp;&amp; claudeRenamedTitle?.trim())) {</span>
+<span class="del">-                    return aiTitle || lastPrompt || claudeRenamedTitle;</span>
+<span class="del">-                }</span>
+             }
+<span class="del">-        }</span>
+<span class="del">-        catch {</span>
+<span class="del">-            // Ignore missing/unreadable files so sync can continue.</span>
+<span class="del">-        }</span>
+<span class="del">-        return undefined;</span>
+<span class="add">+        } catch { /* unreadable file: fall through */ }</span>
+<span class="add">+        return result;</span>
+     }
+ }
+<span class="del">-//# sourceMappingURL=claude-session-synchronizer.provider.js.map</span>
+<span class="dim">\ No newline at end of file</span></pre></div></details>
+<details class="file"><summary><code>dist-server/server/modules/providers/services/session-synchronizer.service.js</code><span class="st"><b class="pa">+1</b> <b class="pd">−1</b></span><span class="note">同步时只处理 claude provider</span></summary>
+<div class="codewrap"><button class="copy" type="button">复制</button><pre class="diff"><span class="h">--- a/dist-server/server/modules/providers/services/session-synchronizer.service.js</span>
+<span class="h">+++ b/dist-server/server/modules/providers/services/session-synchronizer.service.js</span>
+<span class="at">@@ -69,7 +69,7 @@</span>
+         opencode: 0,
+     };
+     const failures = [];
+<span class="del">-    const results = await Promise.allSettled(providerRegistry.listProviders().map(async (provider) =&gt; ({</span>
+<span class="add">+    const results = await Promise.allSettled(providerRegistry.listProviders().filter((provider) =&gt; provider.id === &quot;claude&quot;) /* PATCHED (local) */ .map(async (provider) =&gt; ({</span>
+         provider: provider.id,
+         processed: await provider.sessionSynchronizer.synchronize(lastScanAt ?? undefined),
+     })));
+<span class="dim">\ No newline at end of file</span></pre></div></details>
+<details class="file"><summary><code>dist-server/server/modules/providers/services/sessions-watcher.service.js</code><span class="st"><b class="pa">+3</b> <b class="pd">−1</b></span><span class="note">文件监听只看 ~/.claude/projects</span></summary>
+<div class="codewrap"><button class="copy" type="button">复制</button><pre class="diff"><span class="h">--- a/dist-server/server/modules/providers/services/sessions-watcher.service.js</span>
+<span class="h">+++ b/dist-server/server/modules/providers/services/sessions-watcher.service.js</span>
+<span class="at">@@ -4,7 +4,7 @@</span>
+ import chokidar from &#x27;chokidar&#x27;;
+ import { sessionSynchronizerService } from &#x27;../../../modules/providers/services/session-synchronizer.service.js&#x27;;
+ import { broadcastSessionUpsertedBatch } from &#x27;../../../modules/websocket/index.js&#x27;;
+<span class="del">-const PROVIDER_WATCH_PATHS = [</span>
+<span class="add">+const PROVIDER_WATCH_PATHS_ALL = [</span>
+     {
+         provider: &#x27;claude&#x27;,
+         rootPath: path.join(os.homedir(), &#x27;.claude&#x27;, &#x27;projects&#x27;),
+<span class="dim">\ No newline at end of file</span>
+<span class="at">@@ -22,6 +22,8 @@</span>
+         rootPath: path.join(os.homedir(), &#x27;.local&#x27;, &#x27;share&#x27;, &#x27;opencode&#x27;),
+     },
+ ];
+<span class="add">+// PATCHED (local): only watch Claude transcripts.</span>
+<span class="add">+const PROVIDER_WATCH_PATHS = PROVIDER_WATCH_PATHS_ALL.filter((entry) =&gt; entry.provider === &quot;claude&quot;);</span>
+ const WATCHER_IGNORED_PATTERNS = [
+     &#x27;**/node_modules/**&#x27;,
+     &#x27;**/.git/**&#x27;,
+<span class="dim">\ No newline at end of file</span></pre></div></details>
+<details class="file"><summary><code>dist/index.html</code><span class="st"><b class="pa">+135</b> <b class="pd">−0</b></span><span class="note">注入占位 token（免登录）+ 额度胶囊 + 文件「打开 ▾」菜单 + 粘贴非图片文件</span></summary>
+<div class="codewrap"><button class="copy" type="button">复制</button><pre class="diff"><span class="h">--- a/dist/index.html</span>
+<span class="h">+++ b/dist/index.html</span>
+<span class="at">@@ -6,6 +6,7 @@</span>
+     &lt;link rel=&quot;icon&quot; type=&quot;image/png&quot; href=&quot;/favicon.png&quot; /&gt;
+     &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content&quot; /&gt;
+     &lt;title&gt;CloudCLI UI&lt;/title&gt;
+<span class="add">+    &lt;script&gt;try{localStorage.getItem(&quot;auth-token&quot;)||localStorage.setItem(&quot;auth-token&quot;,&quot;eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoibG9jYWwiLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6NDEwMjQ0NDgwMH0.local&quot;)}catch(e){}&lt;/script&gt;</span>
+ 
+     &lt;!-- Fonts: Encode Sans (UI) + Merriweather (chat) --&gt;
+     &lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.googleapis.com&quot; /&gt;
+<span class="at">@@ -38,6 +39,140 @@</span>
+     &lt;link rel=&quot;modulepreload&quot; crossorigin href=&quot;/assets/vendor-codemirror-CYrSt7-U.js&quot;&gt;
+     &lt;link rel=&quot;modulepreload&quot; crossorigin href=&quot;/assets/vendor-xterm-CS4rQ5Mr.js&quot;&gt;
+     &lt;link rel=&quot;stylesheet&quot; crossorigin href=&quot;/assets/index-BTDHQ6Id.css&quot;&gt;
+<span class="add">+  </span>
+<span class="add">+    &lt;!-- PATCH:claude-usage-widget --&gt;</span>
+<span class="add">+    &lt;style&gt;</span>
+<span class="add">+      #cu-widget{position:fixed;right:14px;bottom:14px;z-index:9999;font:12px/1.4 -apple-system,BlinkMacSystemFont,&quot;Encode Sans&quot;,sans-serif;color:#1f2937}</span>
+<span class="add">+      #cu-widget .cu-pill{display:flex;gap:10px;align-items:center;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.92);border:1px solid rgba(0,0,0,.12);box-shadow:0 2px 10px rgba(0,0,0,.12);cursor:pointer;backdrop-filter:blur(8px);white-space:nowrap}</span>
+<span class="add">+      #cu-widget .cu-pill span b{font-weight:600}</span>
+<span class="add">+      #cu-widget .cu-panel{display:none;position:absolute;right:0;bottom:36px;width:280px;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.97);border:1px solid rgba(0,0,0,.12);box-shadow:0 6px 24px rgba(0,0,0,.16)}</span>
+<span class="add">+      #cu-widget.open .cu-panel{display:block}</span>
+<span class="add">+      #cu-widget .cu-row{margin:8px 0}</span>
+<span class="add">+      #cu-widget .cu-row .cu-l{display:flex;justify-content:space-between;margin-bottom:3px}</span>
+<span class="add">+      #cu-widget .cu-bar{height:6px;border-radius:3px;background:rgba(0,0,0,.08);overflow:hidden}</span>
+<span class="add">+      #cu-widget .cu-bar i{display:block;height:100%;border-radius:3px;background:#3b82f6}</span>
+<span class="add">+      #cu-widget .warning i,#cu-widget .warning .cu-dot{background:#f59e0b}</span>
+<span class="add">+      #cu-widget .critical i,#cu-widget .critical .cu-dot{background:#ef4444}</span>
+<span class="add">+      #cu-widget .cu-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#3b82f6;margin-right:5px;vertical-align:1px}</span>
+<span class="add">+      #cu-widget .cu-meta{margin-top:8px;font-size:11px;color:#6b7280;display:flex;justify-content:space-between}</span>
+<span class="add">+      #cu-widget .cu-meta a{color:#6b7280;cursor:pointer;text-decoration:underline}</span>
+<span class="add">+      @media (prefers-color-scheme:dark){#cu-widget{color:#e5e7eb}#cu-widget .cu-pill,#cu-widget .cu-panel{background:rgba(24,24,27,.94);border-color:rgba(255,255,255,.14)}#cu-widget .cu-bar{background:rgba(255,255,255,.12)}#cu-widget .cu-meta,#cu-widget .cu-meta a{color:#9ca3af}}</span>
+<span class="add">+      .dark #cu-widget{color:#e5e7eb}.dark #cu-widget .cu-pill,.dark #cu-widget .cu-panel{background:rgba(24,24,27,.94);border-color:rgba(255,255,255,.14)}.dark #cu-widget .cu-bar{background:rgba(255,255,255,.12)}.dark #cu-widget .cu-meta,.dark #cu-widget .cu-meta a{color:#9ca3af}</span>
+<span class="add">+    &lt;/style&gt;</span>
+<span class="add">+    &lt;script&gt;</span>
+<span class="add">+    (function(){</span>
+<span class="add">+      var POLL=60000, el, pill, panel, timer;</span>
+<span class="add">+      function label(r){ if(r.kind===&#x27;session&#x27;)return &#x27;5 小时&#x27;; if(r.kind===&#x27;weekly_all&#x27;)return &#x27;本周 · 全部模型&#x27;; if(r.kind===&#x27;weekly_scoped&#x27;){var s=r.scope||{};var n=(s.model&amp;&amp;s.model.display_name)||(s.surface&amp;&amp;s.surface.display_name)||&#x27;&#x27;;return &#x27;本周 · &#x27;+n;} return r.kind; }</span>
+<span class="add">+      function short(r){ if(r.kind===&#x27;session&#x27;)return &#x27;5h&#x27;; if(r.kind===&#x27;weekly_all&#x27;)return &#x27;周&#x27;; if(r.kind===&#x27;weekly_scoped&#x27;){var s=r.scope||{};return (s.model&amp;&amp;s.model.display_name)||(s.surface&amp;&amp;s.surface.display_name)||&#x27;周*&#x27;;} return r.kind; }</span>
+<span class="add">+      function resetText(iso){ if(!iso)return &#x27;&#x27;; var d=new Date(iso), ms=d-Date.now(); if(ms&lt;=0)return &#x27;即将重置&#x27;; var h=Math.floor(ms/3600000), m=Math.floor(ms%3600000/60000); if(h&gt;=48)return Math.floor(h/24)+&#x27; 天后重置&#x27;; return (h?h+&#x27; 小时 &#x27;:&#x27;&#x27;)+m+&#x27; 分后重置&#x27;; }</span>
+<span class="add">+      function render(d){</span>
+<span class="add">+        var rows=(d.limits||[]).slice();</span>
+<span class="add">+        if(!rows.length){ pill.innerHTML=&#x27;&lt;span&gt;额度：不可用&lt;/span&gt;&#x27;; panel.innerHTML=&#x27;&lt;div&gt;&#x27;+(d.available===false?&#x27;当前登录方式不适用套餐额度&#x27;:&#x27;暂无数据&#x27;)+&#x27;&lt;/div&gt;&#x27;; return; }</span>
+<span class="add">+        pill.innerHTML=rows.map(function(r){return &#x27;&lt;span class=&quot;&#x27;+r.severity+&#x27;&quot;&gt;&lt;i class=&quot;cu-dot&quot;&gt;&lt;/i&gt;&#x27;+short(r)+&#x27; &lt;b&gt;&#x27;+r.percent+&#x27;%&lt;/b&gt;&lt;/span&gt;&#x27;;}).join(&#x27;&#x27;);</span>
+<span class="add">+        panel.innerHTML=rows.map(function(r){return &#x27;&lt;div class=&quot;cu-row &#x27;+r.severity+&#x27;&quot;&gt;&lt;div class=&quot;cu-l&quot;&gt;&lt;span&gt;&#x27;+label(r)+&#x27;&lt;/span&gt;&lt;span&gt;&lt;b&gt;&#x27;+r.percent+&#x27;%&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;cu-bar&quot;&gt;&lt;i style=&quot;width:&#x27;+Math.min(100,r.percent)+&#x27;%&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;div style=&quot;font-size:11px;color:#6b7280;margin-top:2px&quot;&gt;&#x27;+resetText(r.resets_at)+&#x27;&lt;/div&gt;&lt;/div&gt;&#x27;;}).join(&#x27;&#x27;)</span>
+<span class="add">+          +&#x27;&lt;div class=&quot;cu-meta&quot;&gt;&lt;span&gt;&#x27;+(d.subscription_type?(&#x27;套餐 &#x27;+d.subscription_type.toUpperCase()):&#x27;&#x27;)+&#x27; · &#x27;+new Date(d.fetchedAt).toLocaleTimeString()+&#x27;&lt;/span&gt;&lt;a data-refresh&gt;刷新&lt;/a&gt;&lt;/div&gt;&#x27;;</span>
+<span class="add">+      }</span>
+<span class="add">+      function load(force){</span>
+<span class="add">+        fetch(&#x27;/api/claude-usage&#x27;+(force?&#x27;?force=1&#x27;:&#x27;&#x27;)).then(function(r){return r.json();}).then(render).catch(function(){ pill.innerHTML=&#x27;&lt;span&gt;额度：读取失败&lt;/span&gt;&#x27;; });</span>
+<span class="add">+      }</span>
+<span class="add">+      function init(){</span>
+<span class="add">+        el=document.createElement(&#x27;div&#x27;); el.id=&#x27;cu-widget&#x27;;</span>
+<span class="add">+        el.innerHTML=&#x27;&lt;div class=&quot;cu-panel&quot;&gt;&lt;/div&gt;&lt;div class=&quot;cu-pill&quot;&gt;&lt;span&gt;额度加载中…&lt;/span&gt;&lt;/div&gt;&#x27;;</span>
+<span class="add">+        document.body.appendChild(el); pill=el.querySelector(&#x27;.cu-pill&#x27;); panel=el.querySelector(&#x27;.cu-panel&#x27;);</span>
+<span class="add">+        pill.addEventListener(&#x27;click&#x27;,function(){ el.classList.toggle(&#x27;open&#x27;); });</span>
+<span class="add">+        panel.addEventListener(&#x27;click&#x27;,function(e){ if(e.target&amp;&amp;e.target.hasAttribute(&#x27;data-refresh&#x27;)){ load(true); } });</span>
+<span class="add">+        load(false); timer=setInterval(function(){ if(!document.hidden) load(false); },POLL);</span>
+<span class="add">+        document.addEventListener(&#x27;visibilitychange&#x27;,function(){ if(!document.hidden) load(false); });</span>
+<span class="add">+      }</span>
+<span class="add">+      if(document.readyState===&#x27;loading&#x27;) document.addEventListener(&#x27;DOMContentLoaded&#x27;,init); else init();</span>
+<span class="add">+    })();</span>
+<span class="add">+    &lt;/script&gt;</span>
+<span class="add">+    &lt;!-- /PATCH:claude-usage-widget --&gt;</span>
+<span class="add">+  </span>
+<span class="add">+    &lt;!-- PATCH:file-actions --&gt;</span>
+<span class="add">+    &lt;style&gt;</span>
+<span class="add">+      .cu-fa-btn{display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:0 6px;height:18px;border-radius:9px;border:1px solid rgba(0,0,0,.15);background:rgba(0,0,0,.04);font-size:10px;line-height:1;color:#374151;cursor:pointer;vertical-align:middle;white-space:nowrap}</span>
+<span class="add">+      .cu-fa-btn:hover{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#1d4ed8}</span>
+<span class="add">+      .dark .cu-fa-btn{border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#d1d5db}.dark .cu-fa-btn:hover{color:#93c5fd}</span>
+<span class="add">+      .cu-fa-menu{position:fixed;z-index:10000;min-width:200px;padding:6px;border-radius:10px;background:#fff;border:1px solid rgba(0,0,0,.12);box-shadow:0 8px 28px rgba(0,0,0,.18);font:13px/1.4 -apple-system,BlinkMacSystemFont,&quot;Encode Sans&quot;,sans-serif;color:#1f2937}</span>
+<span class="add">+      .dark .cu-fa-menu{background:#1c1c20;border-color:rgba(255,255,255,.14);color:#e5e7eb}</span>
+<span class="add">+      .cu-fa-menu .cu-fa-path{padding:4px 8px 6px;font-size:11px;color:#6b7280;word-break:break-all;border-bottom:1px solid rgba(128,128,128,.2);margin-bottom:4px}</span>
+<span class="add">+      .cu-fa-menu .cu-fa-item{display:block;width:100%;text-align:left;padding:6px 8px;border-radius:6px;background:none;border:0;color:inherit;font:inherit;cursor:pointer}</span>
+<span class="add">+      .cu-fa-menu .cu-fa-item:hover{background:rgba(59,130,246,.12)}</span>
+<span class="add">+      .cu-fa-menu .cu-fa-item[disabled]{opacity:.5;cursor:default}</span>
+<span class="add">+    &lt;/style&gt;</span>
+<span class="add">+    &lt;script&gt;</span>
+<span class="add">+    (function(){</span>
+<span class="add">+      var apps=null, menu=null, FIBER_PREFIX=&#x27;__reactFiber&#x27;+String.fromCharCode(36);</span>
+<span class="add">+      function getApps(cb){ if(apps){cb(apps);return;} fetch(&#x27;/api/local-file/apps&#x27;).then(function(r){return r.json();}).then(function(d){apps=d.apps||[];cb(apps);}).catch(function(){apps=[];cb(apps);}); }</span>
+<span class="add">+      function fiberOf(el){ for(var k in el){ if(k.indexOf(FIBER_PREFIX)===0) return el[k]; } return null; }</span>
+<span class="add">+      function findTool(el){ var f=fiberOf(el), n=0; while(f&amp;&amp;n&lt;30){ var p=f.memoizedProps; if(p&amp;&amp;p.toolInput&amp;&amp;typeof p.toolInput===&#x27;object&#x27;){ var ti=p.toolInput; var fp=ti.file_path||ti.notebook_path||ti.path; if(typeof fp===&#x27;string&#x27;&amp;&amp;fp) return {path:fp,toolName:p.toolName,onFileOpen:typeof p.onFileOpen===&#x27;function&#x27;?p.onFileOpen:null}; return null; } f=f.return; n++; } return null; }</span>
+<span class="add">+      function post(body){ return fetch(&#x27;/api/local-file/open&#x27;,{method:&#x27;POST&#x27;,headers:{&#x27;Content-Type&#x27;:&#x27;application/json&#x27;},body:JSON.stringify(body)}).then(function(r){return r.json();}).then(function(d){ if(d.error) alert(&#x27;打开失败：&#x27;+d.error); }); }</span>
+<span class="add">+      function closeMenu(){ if(menu){menu.remove();menu=null;} }</span>
+<span class="add">+      document.addEventListener(&#x27;click&#x27;,function(e){ if(menu&amp;&amp;!menu.contains(e.target)) closeMenu(); },true);</span>
+<span class="add">+      document.addEventListener(&#x27;keydown&#x27;,function(e){ if(e.key===&#x27;Escape&#x27;) closeMenu(); });</span>
+<span class="add">+      function openMenu(btn,info){</span>
+<span class="add">+        closeMenu(); var r=btn.getBoundingClientRect(); menu=document.createElement(&#x27;div&#x27;); menu.className=&#x27;cu-fa-menu&#x27;;</span>
+<span class="add">+        var isMd=/\.(md|markdown|mdx|txt)$/i.test(info.path);</span>
+<span class="add">+        function item(label,fn,dis){ var b=document.createElement(&#x27;button&#x27;); b.className=&#x27;cu-fa-item&#x27;; b.textContent=label; if(dis) b.disabled=true; b.addEventListener(&#x27;click&#x27;,function(ev){ev.stopPropagation(); closeMenu(); fn();}); menu.appendChild(b); }</span>
+<span class="add">+        var pathEl=document.createElement(&#x27;div&#x27;); pathEl.className=&#x27;cu-fa-path&#x27;; pathEl.textContent=info.path; menu.appendChild(pathEl);</span>
+<span class="add">+        item(&#x27;直接打开（默认程序）&#x27;,function(){post({path:info.path,mode:&#x27;default&#x27;});});</span>
+<span class="add">+        getApps(function(list){ list.forEach(function(a){ item(&#x27;用 &#x27;+a+&#x27; 打开&#x27;,function(){post({path:info.path,mode:&#x27;app&#x27;,app:a});}); }); });</span>
+<span class="add">+        item(&#x27;在 CloudCLI 编辑器中打开&#x27;,function(){ info.onFileOpen(info.path); },!info.onFileOpen);</span>
+<span class="add">+        if(isMd) item(&#x27;预览 Markdown（新标签页）&#x27;,function(){ window.open(&#x27;/api/local-file/preview?path=&#x27;+encodeURIComponent(info.path),&#x27;_blank&#x27;); });</span>
+<span class="add">+        item(&#x27;在访达中显示&#x27;,function(){post({path:info.path,mode:&#x27;reveal&#x27;});});</span>
+<span class="add">+        item(&#x27;复制路径&#x27;,function(){ try{navigator.clipboard.writeText(info.path);}catch(e){} });</span>
+<span class="add">+        document.body.appendChild(menu);</span>
+<span class="add">+        var mw=menu.offsetWidth, mh=menu.offsetHeight, x=Math.min(r.left, window.innerWidth-mw-8), y=r.bottom+4; if(y+mh&gt;window.innerHeight-8) y=r.top-mh-4;</span>
+<span class="add">+        menu.style.left=Math.max(8,x)+&#x27;px&#x27;; menu.style.top=Math.max(8,y)+&#x27;px&#x27;;</span>
+<span class="add">+      }</span>
+<span class="add">+      function placeButton(root,info){</span>
+<span class="add">+        var base=info.path.split(&#x27;/&#x27;).pop(), anchor=null, els=root.querySelectorAll(&#x27;span,button,code,div,a&#x27;);</span>
+<span class="add">+        for(var i=0;i&lt;els.length;i++){ var t=(els[i].textContent||&#x27;&#x27;).trim(); if(els[i].children.length===0&amp;&amp;(t===base||t===info.path)){ anchor=els[i]; break; } }</span>
+<span class="add">+        var btn=document.createElement(&#x27;button&#x27;); btn.className=&#x27;cu-fa-btn&#x27;; btn.type=&#x27;button&#x27;; btn.title=info.path; btn.textContent=&#x27;打开 ▾&#x27;;</span>
+<span class="add">+        btn.addEventListener(&#x27;click&#x27;,function(e){ e.preventDefault(); e.stopPropagation(); openMenu(btn,info); });</span>
+<span class="add">+        if(anchor){ anchor.insertAdjacentElement(&#x27;afterend&#x27;,btn); } else { (root.firstElementChild||root).appendChild(btn); }</span>
+<span class="add">+      }</span>
+<span class="add">+      function scan(){</span>
+<span class="add">+        var nodes=document.querySelectorAll(&#x27;div[class*=&quot;border-l-2&quot;]:not([data-cu-fa]),div.group:not([data-cu-fa])&#x27;);</span>
+<span class="add">+        for(var i=0;i&lt;nodes.length;i++){ var el=nodes[i]; var info=findTool(el); if(!info){ el.setAttribute(&#x27;data-cu-fa&#x27;,&#x27;none&#x27;); continue; } if(!/^(Write|Edit|MultiEdit|Read|NotebookEdit|ApplyPatch)$/.test(info.toolName||&#x27;&#x27;)) { el.setAttribute(&#x27;data-cu-fa&#x27;,&#x27;skip&#x27;); continue; } el.setAttribute(&#x27;data-cu-fa&#x27;,&#x27;1&#x27;); placeButton(el,info); }</span>
+<span class="add">+      }</span>
+<span class="add">+      var timer=null; function schedule(){ if(timer) return; timer=setTimeout(function(){timer=null; try{scan();}catch(e){}},250); }</span>
+<span class="add">+      function init(){ new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true}); schedule(); }</span>
+<span class="add">+      if(document.readyState===&#x27;loading&#x27;) document.addEventListener(&#x27;DOMContentLoaded&#x27;,init); else init();</span>
+<span class="add">+    })();</span>
+<span class="add">+    &lt;/script&gt;</span>
+<span class="add">+    &lt;!-- /PATCH:file-actions --&gt;</span>
+<span class="add">+  </span>
+<span class="add">+    &lt;!-- PATCH:paste-files --&gt;</span>
+<span class="add">+    &lt;script&gt;</span>
+<span class="add">+    (function(){</span>
+<span class="add">+      // Route non-image files pasted from Finder into the chat composer&#x27;s dropzone (the app&#x27;s own paste handler only accepts images).</span>
+<span class="add">+      function composerInput(){</span>
+<span class="add">+        var ta=document.querySelector(&#x27;textarea&#x27;);</span>
+<span class="add">+        var scope=ta?(ta.closest(&#x27;form&#x27;)||ta.parentElement&amp;&amp;ta.parentElement.parentElement&amp;&amp;ta.parentElement.parentElement.parentElement||document):document;</span>
+<span class="add">+        var inputs=Array.prototype.slice.call((scope||document).querySelectorAll(&#x27;input[type=&quot;file&quot;]&#x27;));</span>
+<span class="add">+        if(!inputs.length) inputs=Array.prototype.slice.call(document.querySelectorAll(&#x27;input[type=&quot;file&quot;]&#x27;));</span>
+<span class="add">+        // react-dropzone input: tabindex=-1 and clip style, not the file-tree &quot;hidden&quot; upload input</span>
+<span class="add">+        var dz=inputs.filter(function(i){return i.getAttribute(&#x27;tabindex&#x27;)===&#x27;-1&#x27;&amp;&amp;!i.classList.contains(&#x27;hidden&#x27;);});</span>
+<span class="add">+        return dz[0]||inputs[0]||null;</span>
+<span class="add">+      }</span>
+<span class="add">+      document.addEventListener(&#x27;paste&#x27;,function(e){</span>
+<span class="add">+        var cd=e.clipboardData; if(!cd||!cd.files||!cd.files.length) return;</span>
+<span class="add">+        var files=Array.prototype.slice.call(cd.files);</span>
+<span class="add">+        var nonImage=files.filter(function(f){return !(f.type||&#x27;&#x27;).startsWith(&#x27;image/&#x27;);});</span>
+<span class="add">+        if(!nonImage.length) return; // images: let the app handle</span>
+<span class="add">+        var input=composerInput(); if(!input) return;</span>
+<span class="add">+        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();</span>
+<span class="add">+        try{</span>
+<span class="add">+          var dt=new DataTransfer(); files.forEach(function(f){dt.items.add(f);});</span>
+<span class="add">+          input.files=dt.files;</span>
+<span class="add">+          input.dispatchEvent(new Event(&#x27;change&#x27;,{bubbles:true}));</span>
+<span class="add">+        }catch(err){ console.warn(&#x27;[paste-files] failed&#x27;,err); }</span>
+<span class="add">+      },true);</span>
+<span class="add">+    })();</span>
+<span class="add">+    &lt;/script&gt;</span>
+<span class="add">+    &lt;!-- /PATCH:paste-files --&gt;</span>
+   &lt;/head&gt;
+   &lt;body&gt;
+     &lt;div id=&quot;root&quot;&gt;&lt;/div&gt;</pre></div></details>
+<details class="file"><summary><code>dist-server/server/claude-usage.patch.js</code><span class="st"><b class="pa">+31</b> <b class="pd">−0</b></span><span class="note">新增：通过 Agent SDK 读订阅额度，缓存 60 秒</span></summary>
+<div class="codewrap"><button class="copy" type="button">复制</button><pre class="diff"><span class="h">--- /dev/null</span>
+<span class="h">+++ b/dist-server/server/claude-usage.patch.js</span>
+<span class="at">@@ -0,0 +1,31 @@</span>
+<span class="add">+// PATCHED (local): Claude plan usage meter for the web UI.</span>
+<span class="add">+// Uses the Agent SDK&#x27;s /usage control request, so the Claude CLI reads its own</span>
+<span class="add">+// login credentials; this module never touches them.</span>
+<span class="add">+import { query } from &#x27;@anthropic-ai/claude-agent-sdk&#x27;;</span>
+<span class="add">+import os from &#x27;node:os&#x27;;</span>
+<span class="add">+const CACHE_MS = 60_000;</span>
+<span class="add">+let cache = { at: 0, data: null };</span>
+<span class="add">+let inFlight = null;</span>
+<span class="add">+async function* never() { await new Promise(() =&gt; {}); }</span>
+<span class="add">+async function fetchUsage() {</span>
+<span class="add">+    const q = query({ prompt: never(), options: { cwd: os.homedir(), permissionMode: &#x27;default&#x27;, allowedTools: [], maxTurns: 1 } });</span>
+<span class="add">+    try {</span>
+<span class="add">+        const u = await q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true });</span>
+<span class="add">+        return { fetchedAt: new Date().toISOString(), subscription_type: u.subscription_type ?? null, rate_limits_available: u.rate_limits_available, rate_limits: u.rate_limits ?? null };</span>
+<span class="add">+    } finally {</span>
+<span class="add">+        // Only close. interrupt() after close rejects asynchronously and would</span>
+<span class="add">+        // take the whole server down as an unhandled rejection.</span>
+<span class="add">+        try { const r = q.close?.(); if (r &amp;&amp; typeof r.catch === &#x27;function&#x27;) r.catch(() =&gt; {}); } catch { /* ignore */ }</span>
+<span class="add">+    }</span>
+<span class="add">+}</span>
+<span class="add">+export async function getClaudeUsage(force = false) {</span>
+<span class="add">+    if (!force &amp;&amp; cache.data &amp;&amp; Date.now() - cache.at &lt; CACHE_MS) return { ...cache.data, cached: true };</span>
+<span class="add">+    if (!inFlight) {</span>
+<span class="add">+        inFlight = fetchUsage().then((data) =&gt; { cache = { at: Date.now(), data }; return data; }).finally(() =&gt; { inFlight = null; });</span>
+<span class="add">+    }</span>
+<span class="add">+    return inFlight;</span>
+<span class="add">+}</span>
+<span class="add">+if (process.argv[1] &amp;&amp; process.argv[1].endsWith(&#x27;claude-usage.patch.js&#x27;)) {</span>
+<span class="add">+    const t0 = Date.now();</span>
+<span class="add">+    getClaudeUsage(true).then((d) =&gt; { console.log(JSON.stringify({ ms: Date.now() - t0, ...d }, null, 1)); process.exit(0); }, (e) =&gt; { console.error(&#x27;ERR&#x27;, e?.message); process.exit(1); });</span>
+<span class="add">+}</span></pre></div></details>
+<details class="file"><summary><code>dist-server/server/local-file.patch.js</code><span class="st"><b class="pa">+62</b> <b class="pd">−0</b></span><span class="note">新增：检测编辑器、用 open 打开文件、Markdown 预览</span></summary>
+<div class="codewrap"><button class="copy" type="button">复制</button><pre class="diff"><span class="h">--- /dev/null</span>
+<span class="h">+++ b/dist-server/server/local-file.patch.js</span>
+<span class="at">@@ -0,0 +1,62 @@</span>
+<span class="add">+// PATCHED (local): open local files from the chat UI (default app / chosen app / Finder / markdown preview).</span>
+<span class="add">+import fs from &#x27;node:fs&#x27;;</span>
+<span class="add">+import path from &#x27;node:path&#x27;;</span>
+<span class="add">+import os from &#x27;node:os&#x27;;</span>
+<span class="add">+import { execFile } from &#x27;node:child_process&#x27;;</span>
+<span class="add">+import { marked } from &#x27;marked&#x27;;</span>
+<span class="add">+const CANDIDATE_APPS = [&#x27;Typora&#x27;, &#x27;TextEdit&#x27;, &#x27;Visual Studio Code&#x27;, &#x27;Cursor&#x27;, &#x27;Sublime Text&#x27;, &#x27;Obsidian&#x27;, &#x27;Zed&#x27;, &#x27;Xcode&#x27;, &#x27;BBEdit&#x27;, &#x27;MacDown&#x27;, &#x27;iA Writer&#x27;, &#x27;Nova&#x27;, &#x27;TextMate&#x27;];</span>
+<span class="add">+const APP_DIRS = [&#x27;/Applications&#x27;, &#x27;/System/Applications&#x27;, path.join(os.homedir(), &#x27;Applications&#x27;)];</span>
+<span class="add">+export function listApps() {</span>
+<span class="add">+    const found = [];</span>
+<span class="add">+    for (const name of CANDIDATE_APPS) {</span>
+<span class="add">+        for (const dir of APP_DIRS) {</span>
+<span class="add">+            if (fs.existsSync(path.join(dir, `${name}.app`))) { found.push(name); break; }</span>
+<span class="add">+        }</span>
+<span class="add">+    }</span>
+<span class="add">+    return found;</span>
+<span class="add">+}</span>
+<span class="add">+function resolveTarget(raw) {</span>
+<span class="add">+    if (typeof raw !== &#x27;string&#x27; || !raw.trim()) throw Object.assign(new Error(&#x27;path required&#x27;), { status: 400 });</span>
+<span class="add">+    let p = raw.trim();</span>
+<span class="add">+    if (p.startsWith(&#x27;~/&#x27;)) p = path.join(os.homedir(), p.slice(2));</span>
+<span class="add">+    if (!path.isAbsolute(p)) throw Object.assign(new Error(&#x27;path must be absolute&#x27;), { status: 400 });</span>
+<span class="add">+    p = path.normalize(p);</span>
+<span class="add">+    if (!fs.existsSync(p)) throw Object.assign(new Error(&#x27;file not found: &#x27; + p), { status: 404 });</span>
+<span class="add">+    return p;</span>
+<span class="add">+}</span>
+<span class="add">+function run(args) {</span>
+<span class="add">+    return new Promise((resolve, reject) =&gt; {</span>
+<span class="add">+        execFile(&#x27;/usr/bin/open&#x27;, args, { timeout: 15000 }, (err, stdout, stderr) =&gt; err ? reject(new Error((stderr || err.message).trim())) : resolve((stdout || &#x27;&#x27;).trim()));</span>
+<span class="add">+    });</span>
+<span class="add">+}</span>
+<span class="add">+export async function openTarget({ path: raw, mode = &#x27;default&#x27;, app, dry }) {</span>
+<span class="add">+    const target = resolveTarget(raw);</span>
+<span class="add">+    let args;</span>
+<span class="add">+    if (mode === &#x27;reveal&#x27;) args = [&#x27;-R&#x27;, target];</span>
+<span class="add">+    else if (mode === &#x27;app&#x27;) {</span>
+<span class="add">+        if (!listApps().includes(app)) throw Object.assign(new Error(&#x27;unknown app: &#x27; + app), { status: 400 });</span>
+<span class="add">+        args = [&#x27;-a&#x27;, app, target];</span>
+<span class="add">+    } else args = [target];</span>
+<span class="add">+    if (dry) return { ok: true, dry: true, command: [&#x27;open&#x27;, ...args] };</span>
+<span class="add">+    await run(args);</span>
+<span class="add">+    return { ok: true, command: [&#x27;open&#x27;, ...args] };</span>
+<span class="add">+}</span>
+<span class="add">+const esc = (s) =&gt; s.replace(/[&amp;&lt;&gt;&quot;]/g, (c) =&gt; ({ &#x27;&amp;&#x27;: &#x27;&amp;amp;&#x27;, &#x27;&lt;&#x27;: &#x27;&amp;lt;&#x27;, &#x27;&gt;&#x27;: &#x27;&amp;gt;&#x27;, &#x27;&quot;&#x27;: &#x27;&amp;quot;&#x27; }[c]));</span>
+<span class="add">+export function renderPreview(raw) {</span>
+<span class="add">+    const target = resolveTarget(raw);</span>
+<span class="add">+    const stat = fs.statSync(target);</span>
+<span class="add">+    if (!stat.isFile()) throw Object.assign(new Error(&#x27;not a file&#x27;), { status: 400 });</span>
+<span class="add">+    if (stat.size &gt; 5 * 1024 * 1024) throw Object.assign(new Error(&#x27;file too large for preview&#x27;), { status: 413 });</span>
+<span class="add">+    const text = fs.readFileSync(target, &#x27;utf8&#x27;);</span>
+<span class="add">+    const ext = path.extname(target).toLowerCase();</span>
+<span class="add">+    const isMd = ext === &#x27;.md&#x27; || ext === &#x27;.markdown&#x27; || ext === &#x27;.mdx&#x27;;</span>
+<span class="add">+    const body = isMd ? marked.parse(text) : `&lt;pre&gt;${esc(text)}&lt;/pre&gt;`;</span>
+<span class="add">+    const name = path.basename(target);</span>
+<span class="add">+    return `&lt;!doctype html&gt;&lt;html lang=&quot;zh&quot;&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot;&gt;&lt;title&gt;${esc(name)}&lt;/title&gt;</span>
+<span class="add">+&lt;style&gt;:root{color-scheme:light dark}body{max-width:860px;margin:32px auto;padding:0 20px 60px;font:15px/1.7 -apple-system,BlinkMacSystemFont,&quot;PingFang SC&quot;,&quot;Helvetica Neue&quot;,sans-serif;color:#1f2937;background:#fff}</span>
+<span class="add">+@media(prefers-color-scheme:dark){body{color:#e5e7eb;background:#111318}pre,code{background:#1f2329!important}a{color:#93c5fd}th,td{border-color:#374151!important}blockquote{border-color:#4b5563;color:#9ca3af}}</span>
+<span class="add">+h1,h2,h3{line-height:1.3}pre{background:#f3f4f6;padding:12px 14px;border-radius:8px;overflow:auto;font-size:13px}code{background:#f3f4f6;padding:1px 5px;border-radius:4px;font-size:.92em}pre code{padding:0;background:none}</span>
+<span class="add">+table{border-collapse:collapse;margin:12px 0}th,td{border:1px solid #d1d5db;padding:6px 10px}blockquote{margin:12px 0;padding:2px 14px;border-left:3px solid #d1d5db;color:#6b7280}img{max-width:100%}</span>
+<span class="add">+.cu-top{font-size:12px;color:#6b7280;margin-bottom:18px;word-break:break-all}.cu-top a{color:inherit}&lt;/style&gt;&lt;/head&gt;</span>
+<span class="add">+&lt;body&gt;&lt;div class=&quot;cu-top&quot;&gt;${esc(target)} · &lt;a href=&quot;#&quot; onclick=&quot;fetch(&#x27;/api/local-file/open&#x27;,{method:&#x27;POST&#x27;,headers:{&#x27;Content-Type&#x27;:&#x27;application/json&#x27;},body:JSON.stringify({path:${JSON.stringify(target)},mode:&#x27;reveal&#x27;})});return false&quot;&gt;在访达中显示&lt;/a&gt;&lt;/div&gt;${body}&lt;/body&gt;&lt;/html&gt;`;</span>
+<span class="add">+}</span></pre></div></details>
+<details class="file"><summary><code>tools/import_to_claude_desktop.py</code><span class="note">导入桌面客户端的工具</span></summary><div class="codewrap"><button class="copy" type="button">复制</button><pre>#!/usr/bin/env python3
+&quot;&quot;&quot;把 ~/.claude/projects 里的 Claude Code 对话挂到 Claude 桌面客户端（Code 标签页）左侧列表。
+
+CloudCLI 和终端里的 claude 都把对话写在 ~/.claude/projects/&lt;编码后的目录&gt;/&lt;id&gt;.jsonl，
+桌面客户端左侧列表的每一项则是
+  ~/Library/Application Support/Claude/claude-code-sessions/&lt;账号&gt;/&lt;组织&gt;/local_&lt;uuid&gt;.json，
+里面的 cliSessionId 指向那个 jsonl。本脚本只新建这些小 JSON，不改任何对话记录。
+
+用法:
+  python3 import_to_claude_desktop.py            # 试运行：只统计、预览标题
+  python3 import_to_claude_desktop.py --apply    # 真正写入，之后 ⌘Q 退出客户端再打开
+撤销: 删掉本脚本写入的 local_*.json（文件里带 &quot;importedBy&quot;: &quot;cloudcli-kit&quot;）。
+&quot;&quot;&quot;
+import glob
+import json
+import os
+import re
+import sys
+import uuid
+from datetime import datetime
+
+APPLY = &quot;--apply&quot; in sys.argv
+PROJECTS = os.path.expanduser(&quot;~/.claude/projects&quot;)
+SESSIONS_ROOT = os.path.expanduser(&quot;~/Library/Application Support/Claude/claude-code-sessions&quot;)
+
+
+def find_meta_dir():
+    # &lt;账号&gt;/&lt;组织&gt; 目录里放着现有会话的 local_*.json；取最近用过的那个
+    dirs = [d for d in glob.glob(os.path.join(SESSIONS_ROOT, &quot;*&quot;, &quot;*&quot;)) if os.path.isdir(d)]
+    if not dirs:
+        sys.exit(&quot;找不到桌面客户端的会话目录：先在 Claude 桌面客户端的 Code 标签页里随便开一个会话&quot;)
+    return max(dirs, key=os.path.getmtime)
+
+
+def encode(path):
+    return re.sub(r&quot;[^A-Za-z0-9]&quot;, &quot;-&quot;, path)
+
+
+def to_ms(ts):
+    return int(datetime.fromisoformat(ts.replace(&quot;Z&quot;, &quot;+00:00&quot;)).timestamp() * 1000)
+
+
+def short_title(text):
+    text = re.sub(r&quot;&lt;command-name&gt;(.*?)&lt;/command-name&gt;&quot;, r&quot;\1 &quot;, text)
+    text = re.sub(r&quot;&lt;[^&gt;]+&gt;[^&lt;]*&lt;/[^&gt;]+&gt;&quot;, &quot;&quot;, text)
+    return re.sub(r&quot;\s+&quot;, &quot; &quot;, text).strip()[:50]
+
+
+def scan(path):
+    info = dict(ts=[], cwds=[], model=None, custom=None, ai=None, first=None, mode=None, entry=set())
+    for line in open(path, errors=&quot;ignore&quot;):
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        kind = d.get(&quot;type&quot;)
+        if d.get(&quot;timestamp&quot;):
+            info[&quot;ts&quot;].append(d[&quot;timestamp&quot;])
+        if d.get(&quot;cwd&quot;) and d[&quot;cwd&quot;] not in info[&quot;cwds&quot;]:
+            info[&quot;cwds&quot;].append(d[&quot;cwd&quot;])
+        if d.get(&quot;entrypoint&quot;):
+            info[&quot;entry&quot;].add(d[&quot;entrypoint&quot;])
+        if kind == &quot;custom-title&quot;:
+            info[&quot;custom&quot;] = d.get(&quot;customTitle&quot;)
+        elif kind == &quot;ai-title&quot;:
+            info[&quot;ai&quot;] = d.get(&quot;aiTitle&quot;)
+        elif kind == &quot;permission-mode&quot;:
+            info[&quot;mode&quot;] = d.get(&quot;permissionMode&quot;)
+        msg = d.get(&quot;message&quot;) or {}
+        if kind == &quot;assistant&quot; and msg.get(&quot;model&quot;) and not msg[&quot;model&quot;].startswith(&quot;&lt;&quot;):
+            info[&quot;model&quot;] = msg[&quot;model&quot;]
+        if info[&quot;first&quot;] is None and kind == &quot;user&quot; and not d.get(&quot;isMeta&quot;):
+            content = msg.get(&quot;content&quot;)
+            if isinstance(content, list):
+                content = &quot; &quot;.join(x.get(&quot;text&quot;, &quot;&quot;) for x in content if isinstance(x, dict) and x.get(&quot;type&quot;) == &quot;text&quot;)
+            if content and content.strip():
+                info[&quot;first&quot;] = content
+    return info
+
+
+def main():
+    meta_dir = find_meta_dir()
+    linked = set()
+    for m in glob.glob(os.path.join(meta_dir, &quot;local_*.json&quot;)):
+        try:
+            linked.add(json.load(open(m)).get(&quot;cliSessionId&quot;))
+        except ValueError:
+            pass
+
+    new, skipped = [], {}
+    for proj in sorted(os.listdir(PROJECTS)):
+        for path in glob.glob(os.path.join(PROJECTS, proj, &quot;*.jsonl&quot;)):
+            cli_id = os.path.basename(path)[:-6]
+            if cli_id in linked:
+                continue
+            s = scan(path)
+            reason = None
+            if not s[&quot;first&quot;] or not s[&quot;ts&quot;]:
+                reason = &quot;没有用户消息&quot;
+            elif s[&quot;entry&quot;] and s[&quot;entry&quot;] &lt;= {&quot;sdk-cli&quot;}:
+                reason = &quot;脚本里 claude -p 的一次性调用&quot;
+            cwd = next((c for c in s[&quot;cwds&quot;] if encode(c) == proj), s[&quot;cwds&quot;][0] if s[&quot;cwds&quot;] else None)
+            if not reason and not (cwd and os.path.isdir(cwd)):
+                reason = &quot;工作目录已不存在&quot;
+            if reason:
+                skipped[reason] = skipped.get(reason, 0) + 1
+                continue
+            new.append(dict(cli=cli_id, cwd=cwd, created=to_ms(min(s[&quot;ts&quot;])), last=to_ms(max(s[&quot;ts&quot;])),
+                            model=s[&quot;model&quot;], mode=s[&quot;mode&quot;] or &quot;default&quot;,
+                            title=s[&quot;custom&quot;] or s[&quot;ai&quot;] or short_title(s[&quot;first&quot;])))
+
+    print(f&quot;客户端会话目录: {meta_dir}&quot;)
+    print(f&quot;已在列表: {len(linked)}   待导入: {len(new)}   跳过: {skipped or 0}&quot;)
+    for o in sorted(new, key=lambda o: -o[&quot;last&quot;])[:20]:
+        print(&quot;  &quot;, datetime.fromtimestamp(o[&quot;last&quot;] / 1000).strftime(&quot;%m-%d %H:%M&quot;), o[&quot;title&quot;])
+    if not APPLY:
+        print(&quot;\n这是试运行。确认无误后加 --apply 写入，然后 ⌘Q 退出 Claude 客户端再打开。&quot;)
+        return
+    for o in new:
+        sid = &quot;local_&quot; + str(uuid.uuid4())
+        meta = {
+            &quot;sessionId&quot;: sid, &quot;cliSessionId&quot;: o[&quot;cli&quot;], &quot;cwd&quot;: o[&quot;cwd&quot;], &quot;originCwd&quot;: o[&quot;cwd&quot;],
+            &quot;createdAt&quot;: o[&quot;created&quot;], &quot;lastActivityAt&quot;: o[&quot;last&quot;], &quot;lastFocusedAt&quot;: o[&quot;last&quot;],
+            &quot;isArchived&quot;: False, &quot;title&quot;: o[&quot;title&quot;], &quot;titleSource&quot;: &quot;user&quot;,
+            &quot;permissionMode&quot;: o[&quot;mode&quot;], &quot;importedBy&quot;: &quot;cloudcli-kit&quot;,
+        }
+        if o[&quot;model&quot;]:
+            meta[&quot;model&quot;] = o[&quot;model&quot;]
+        with open(os.path.join(meta_dir, sid + &quot;.json&quot;), &quot;w&quot;) as f:
+            json.dump(meta, f, ensure_ascii=False)
+    print(f&quot;\n已写入 {len(new)} 条。⌘Q 完全退出 Claude 客户端再打开即可看到。&quot;)
+
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</pre></div></details>
+
+<footer>CloudCLI 是开源项目（<a href="https://www.npmjs.com/package/@cloudcli-ai/cloudcli">npm</a>），本页的补丁为本地自用修改，仅在 1.37.3 上验证过。</footer>
+</div>
+<script>
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('.copy'); if (!b) return;
+  var text = b.parentElement.querySelector('pre').innerText;
+  function done() { b.textContent = '已复制'; b.classList.add('done'); setTimeout(function () { b.textContent = '复制'; b.classList.remove('done'); }, 1400); }
+  function fallback() {
+    var t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); done(); } catch (err) {} document.body.removeChild(t);
+  }
+  // 内网 http 页面没有 navigator.clipboard，走 execCommand 兜底
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+});
+</script>
+</body>
+</html>

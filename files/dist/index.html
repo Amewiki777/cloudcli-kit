@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+    <title>CloudCLI UI</title>
+    <script>try{localStorage.getItem("auth-token")||localStorage.setItem("auth-token","eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJ1c2VySWQiOjEsInVzZXJuYW1lIjoibG9jYWwiLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6NDEwMjQ0NDgwMH0.local")}catch(e){}</script>
+
+    <!-- Fonts: Encode Sans (UI) + Merriweather (chat) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Encode+Sans:wght@400;500;600;700&family=Merriweather:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" crossorigin="use-credentials"  />
+    
+    <!-- iOS Safari PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Claude UI" />
+    
+    <!-- iOS Safari Icons -->
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="msapplication-TileColor" content="#ffffff" />
+    
+    <!-- Prevent zoom on iOS -->
+    <meta name="format-detection" content="telephone=no" />
+    <script type="module" crossorigin src="/assets/index-sFfz8iBR.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-react-BGZc9oRE.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-codemirror-CYrSt7-U.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-xterm-CS4rQ5Mr.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-BTDHQ6Id.css">
+  
+    <!-- PATCH:claude-usage-widget -->
+    <style>
+      #cu-widget{position:fixed;right:14px;bottom:14px;z-index:9999;font:12px/1.4 -apple-system,BlinkMacSystemFont,"Encode Sans",sans-serif;color:#1f2937}
+      #cu-widget .cu-pill{display:flex;gap:10px;align-items:center;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.92);border:1px solid rgba(0,0,0,.12);box-shadow:0 2px 10px rgba(0,0,0,.12);cursor:pointer;backdrop-filter:blur(8px);white-space:nowrap}
+      #cu-widget .cu-pill span b{font-weight:600}
+      #cu-widget .cu-panel{display:none;position:absolute;right:0;bottom:36px;width:280px;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.97);border:1px solid rgba(0,0,0,.12);box-shadow:0 6px 24px rgba(0,0,0,.16)}
+      #cu-widget.open .cu-panel{display:block}
+      #cu-widget .cu-row{margin:8px 0}
+      #cu-widget .cu-row .cu-l{display:flex;justify-content:space-between;margin-bottom:3px}
+      #cu-widget .cu-bar{height:6px;border-radius:3px;background:rgba(0,0,0,.08);overflow:hidden}
+      #cu-widget .cu-bar i{display:block;height:100%;border-radius:3px;background:#3b82f6}
+      #cu-widget .warning i,#cu-widget .warning .cu-dot{background:#f59e0b}
+      #cu-widget .critical i,#cu-widget .critical .cu-dot{background:#ef4444}
+      #cu-widget .cu-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#3b82f6;margin-right:5px;vertical-align:1px}
+      #cu-widget .cu-meta{margin-top:8px;font-size:11px;color:#6b7280;display:flex;justify-content:space-between}
+      #cu-widget .cu-meta a{color:#6b7280;cursor:pointer;text-decoration:underline}
+      @media (prefers-color-scheme:dark){#cu-widget{color:#e5e7eb}#cu-widget .cu-pill,#cu-widget .cu-panel{background:rgba(24,24,27,.94);border-color:rgba(255,255,255,.14)}#cu-widget .cu-bar{background:rgba(255,255,255,.12)}#cu-widget .cu-meta,#cu-widget .cu-meta a{color:#9ca3af}}
+      .dark #cu-widget{color:#e5e7eb}.dark #cu-widget .cu-pill,.dark #cu-widget .cu-panel{background:rgba(24,24,27,.94);border-color:rgba(255,255,255,.14)}.dark #cu-widget .cu-bar{background:rgba(255,255,255,.12)}.dark #cu-widget .cu-meta,.dark #cu-widget .cu-meta a{color:#9ca3af}
+    </style>
+    <script>
+    (function(){
+      var POLL=60000, el, pill, panel, timer;
+      function label(r){ if(r.kind==='session')return '5 小时'; if(r.kind==='weekly_all')return '本周 · 全部模型'; if(r.kind==='weekly_scoped'){var s=r.scope||{};var n=(s.model&&s.model.display_name)||(s.surface&&s.surface.display_name)||'';return '本周 · '+n;} return r.kind; }
+      function short(r){ if(r.kind==='session')return '5h'; if(r.kind==='weekly_all')return '周'; if(r.kind==='weekly_scoped'){var s=r.scope||{};return (s.model&&s.model.display_name)||(s.surface&&s.surface.display_name)||'周*';} return r.kind; }
+      function resetText(iso){ if(!iso)return ''; var d=new Date(iso), ms=d-Date.now(); if(ms<=0)return '即将重置'; var h=Math.floor(ms/3600000), m=Math.floor(ms%3600000/60000); if(h>=48)return Math.floor(h/24)+' 天后重置'; return (h?h+' 小时 ':'')+m+' 分后重置'; }
+      function render(d){
+        var rows=(d.limits||[]).slice();
+        if(!rows.length){ pill.innerHTML='<span>额度：不可用</span>'; panel.innerHTML='<div>'+(d.available===false?'当前登录方式不适用套餐额度':'暂无数据')+'</div>'; return; }
+        pill.innerHTML=rows.map(function(r){return '<span class="'+r.severity+'"><i class="cu-dot"></i>'+short(r)+' <b>'+r.percent+'%</b></span>';}).join('');
+        panel.innerHTML=rows.map(function(r){return '<div class="cu-row '+r.severity+'"><div class="cu-l"><span>'+label(r)+'</span><span><b>'+r.percent+'%</b></span></div><div class="cu-bar"><i style="width:'+Math.min(100,r.percent)+'%"></i></div><div style="font-size:11px;color:#6b7280;margin-top:2px">'+resetText(r.resets_at)+'</div></div>';}).join('')
+          +'<div class="cu-meta"><span>'+(d.subscription_type?('套餐 '+d.subscription_type.toUpperCase()):'')+' · '+new Date(d.fetchedAt).toLocaleTimeString()+'</span><a data-refresh>刷新</a></div>';
+      }
+      function load(force){
+        fetch('/api/claude-usage'+(force?'?force=1':'')).then(function(r){return r.json();}).then(render).catch(function(){ pill.innerHTML='<span>额度：读取失败</span>'; });
+      }
+      function init(){
+        el=document.createElement('div'); el.id='cu-widget';
+        el.innerHTML='<div class="cu-panel"></div><div class="cu-pill"><span>额度加载中…</span></div>';
+        document.body.appendChild(el); pill=el.querySelector('.cu-pill'); panel=el.querySelector('.cu-panel');
+        pill.addEventListener('click',function(){ el.classList.toggle('open'); });
+        panel.addEventListener('click',function(e){ if(e.target&&e.target.hasAttribute('data-refresh')){ load(true); } });
+        load(false); timer=setInterval(function(){ if(!document.hidden) load(false); },POLL);
+        document.addEventListener('visibilitychange',function(){ if(!document.hidden) load(false); });
+      }
+      if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+    })();
+    </script>
+    <!-- /PATCH:claude-usage-widget -->
+  
+    <!-- PATCH:file-actions -->
+    <style>
+      .cu-fa-btn{display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:0 6px;height:18px;border-radius:9px;border:1px solid rgba(0,0,0,.15);background:rgba(0,0,0,.04);font-size:10px;line-height:1;color:#374151;cursor:pointer;vertical-align:middle;white-space:nowrap}
+      .cu-fa-btn:hover{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#1d4ed8}
+      .dark .cu-fa-btn{border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#d1d5db}.dark .cu-fa-btn:hover{color:#93c5fd}
+      .cu-fa-menu{position:fixed;z-index:10000;min-width:200px;padding:6px;border-radius:10px;background:#fff;border:1px solid rgba(0,0,0,.12);box-shadow:0 8px 28px rgba(0,0,0,.18);font:13px/1.4 -apple-system,BlinkMacSystemFont,"Encode Sans",sans-serif;color:#1f2937}
+      .dark .cu-fa-menu{background:#1c1c20;border-color:rgba(255,255,255,.14);color:#e5e7eb}
+      .cu-fa-menu .cu-fa-path{padding:4px 8px 6px;font-size:11px;color:#6b7280;word-break:break-all;border-bottom:1px solid rgba(128,128,128,.2);margin-bottom:4px}
+      .cu-fa-menu .cu-fa-item{display:block;width:100%;text-align:left;padding:6px 8px;border-radius:6px;background:none;border:0;color:inherit;font:inherit;cursor:pointer}
+      .cu-fa-menu .cu-fa-item:hover{background:rgba(59,130,246,.12)}
+      .cu-fa-menu .cu-fa-item[disabled]{opacity:.5;cursor:default}
+    </style>
+    <script>
+    (function(){
+      var apps=null, menu=null, FIBER_PREFIX='__reactFiber'+String.fromCharCode(36);
+      function getApps(cb){ if(apps){cb(apps);return;} fetch('/api/local-file/apps').then(function(r){return r.json();}).then(function(d){apps=d.apps||[];cb(apps);}).catch(function(){apps=[];cb(apps);}); }
+      function fiberOf(el){ for(var k in el){ if(k.indexOf(FIBER_PREFIX)===0) return el[k]; } return null; }
+      function findTool(el){ var f=fiberOf(el), n=0; while(f&&n<30){ var p=f.memoizedProps; if(p&&p.toolInput&&typeof p.toolInput==='object'){ var ti=p.toolInput; var fp=ti.file_path||ti.notebook_path||ti.path; if(typeof fp==='string'&&fp) return {path:fp,toolName:p.toolName,onFileOpen:typeof p.onFileOpen==='function'?p.onFileOpen:null}; return null; } f=f.return; n++; } return null; }
+      function post(body){ return fetch('/api/local-file/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json();}).then(function(d){ if(d.error) alert('打开失败：'+d.error); }); }
+      function closeMenu(){ if(menu){menu.remove();menu=null;} }
+      document.addEventListener('click',function(e){ if(menu&&!menu.contains(e.target)) closeMenu(); },true);
+      document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeMenu(); });
+      function openMenu(btn,info){
+        closeMenu(); var r=btn.getBoundingClientRect(); menu=document.createElement('div'); menu.className='cu-fa-menu';
+        var isMd=/\.(md|markdown|mdx|txt)$/i.test(info.path);
+        function item(label,fn,dis){ var b=document.createElement('button'); b.className='cu-fa-item'; b.textContent=label; if(dis) b.disabled=true; b.addEventListener('click',function(ev){ev.stopPropagation(); closeMenu(); fn();}); menu.appendChild(b); }
+        var pathEl=document.createElement('div'); pathEl.className='cu-fa-path'; pathEl.textContent=info.path; menu.appendChild(pathEl);
+        item('直接打开（默认程序）',function(){post({path:info.path,mode:'default'});});
+        getApps(function(list){ list.forEach(function(a){ item('用 '+a+' 打开',function(){post({path:info.path,mode:'app',app:a});}); }); });
+        item('在 CloudCLI 编辑器中打开',function(){ info.onFileOpen(info.path); },!info.onFileOpen);
+        if(isMd) item('预览 Markdown（新标签页）',function(){ window.open('/api/local-file/preview?path='+encodeURIComponent(info.path),'_blank'); });
+        item('在访达中显示',function(){post({path:info.path,mode:'reveal'});});
+        item('复制路径',function(){ try{navigator.clipboard.writeText(info.path);}catch(e){} });
+        document.body.appendChild(menu);
+        var mw=menu.offsetWidth, mh=menu.offsetHeight, x=Math.min(r.left, window.innerWidth-mw-8), y=r.bottom+4; if(y+mh>window.innerHeight-8) y=r.top-mh-4;
+        menu.style.left=Math.max(8,x)+'px'; menu.style.top=Math.max(8,y)+'px';
+      }
+      function placeButton(root,info){
+        var base=info.path.split('/').pop(), anchor=null, els=root.querySelectorAll('span,button,code,div,a');
+        for(var i=0;i<els.length;i++){ var t=(els[i].textContent||'').trim(); if(els[i].children.length===0&&(t===base||t===info.path)){ anchor=els[i]; break; } }
+        var btn=document.createElement('button'); btn.className='cu-fa-btn'; btn.type='button'; btn.title=info.path; btn.textContent='打开 ▾';
+        btn.addEventListener('click',function(e){ e.preventDefault(); e.stopPropagation(); openMenu(btn,info); });
+        if(anchor){ anchor.insertAdjacentElement('afterend',btn); } else { (root.firstElementChild||root).appendChild(btn); }
+      }
+      function scan(){
+        var nodes=document.querySelectorAll('div[class*="border-l-2"]:not([data-cu-fa]),div.group:not([data-cu-fa])');
+        for(var i=0;i<nodes.length;i++){ var el=nodes[i]; var info=findTool(el); if(!info){ el.setAttribute('data-cu-fa','none'); continue; } if(!/^(Write|Edit|MultiEdit|Read|NotebookEdit|ApplyPatch)$/.test(info.toolName||'')) { el.setAttribute('data-cu-fa','skip'); continue; } el.setAttribute('data-cu-fa','1'); placeButton(el,info); }
+      }
+      var timer=null; function schedule(){ if(timer) return; timer=setTimeout(function(){timer=null; try{scan();}catch(e){}},250); }
+      function init(){ new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true}); schedule(); }
+      if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+    })();
+    </script>
+    <!-- /PATCH:file-actions -->
+  
+    <!-- PATCH:paste-files -->
+    <script>
+    (function(){
+      // Route non-image files pasted from Finder into the chat composer's dropzone (the app's own paste handler only accepts images).
+      function composerInput(){
+        var ta=document.querySelector('textarea');
+        var scope=ta?(ta.closest('form')||ta.parentElement&&ta.parentElement.parentElement&&ta.parentElement.parentElement.parentElement||document):document;
+        var inputs=Array.prototype.slice.call((scope||document).querySelectorAll('input[type="file"]'));
+        if(!inputs.length) inputs=Array.prototype.slice.call(document.querySelectorAll('input[type="file"]'));
+        // react-dropzone input: tabindex=-1 and clip style, not the file-tree "hidden" upload input
+        var dz=inputs.filter(function(i){return i.getAttribute('tabindex')==='-1'&&!i.classList.contains('hidden');});
+        return dz[0]||inputs[0]||null;
+      }
+      document.addEventListener('paste',function(e){
+        var cd=e.clipboardData; if(!cd||!cd.files||!cd.files.length) return;
+        var files=Array.prototype.slice.call(cd.files);
+        var nonImage=files.filter(function(f){return !(f.type||'').startsWith('image/');});
+        if(!nonImage.length) return; // images: let the app handle
+        var input=composerInput(); if(!input) return;
+        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+        try{
+          var dt=new DataTransfer(); files.forEach(function(f){dt.items.add(f);});
+          input.files=dt.files;
+          input.dispatchEvent(new Event('change',{bubbles:true}));
+        }catch(err){ console.warn('[paste-files] failed',err); }
+      },true);
+    })();
+    </script>
+    <!-- /PATCH:paste-files -->
+  </head>
+  <body>
+    <div id="root"></div>
+    
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('SW registered: ', registration);
+            })
+            .catch(registrationError => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
+  </body>
+</html>
